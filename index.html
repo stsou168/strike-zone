@@ -60,7 +60,7 @@ h1 small{display:block;font-size:.72rem;font-weight:500;color:var(--muted);lette
 .bug .pc{display:grid;place-items:center;padding:6px 10px;border-left:1px solid rgba(255,255,255,.14);text-align:center}
 .bug .pc em{font-style:normal;font-size:.8rem;color:#9fb0c6;letter-spacing:.08em}
 .bug .pc strong{font-size:1.9rem;font-weight:600;color:#fff;font-variant-numeric:tabular-nums}
-.call{position:absolute;left:50%;bottom:12%;transform:translateX(-50%);font-weight:900;font-size:clamp(2rem,9vw,3.6rem);letter-spacing:.12em;white-space:nowrap;pointer-events:none;text-shadow:0 3px 14px rgba(0,0,0,.7)}
+.call{position:absolute;left:50%;bottom:4%;transform:translateX(-50%);font-weight:900;font-size:clamp(2rem,9vw,3.6rem);letter-spacing:.12em;white-space:nowrap;pointer-events:none;text-shadow:0 3px 14px rgba(0,0,0,.7)}
 .call small{display:block;text-align:center;font-family:var(--f-score);font-size:.45em;letter-spacing:.3em;font-weight:500}
 .call.strike{color:var(--strike)}
 .call.ball{color:var(--ball)}
@@ -87,6 +87,11 @@ button.b{border-color:color-mix(in srgb,var(--ball) 60%,var(--line));color:var(-
 .seg button small{font-size:.75rem;font-weight:400;color:var(--muted)}
 .seg button[aria-checked="true"]{background:color-mix(in srgb,var(--strike) 18%,#1d2a3d);border-color:var(--strike)}
 .seg button[aria-checked="true"] small{color:var(--fg)}
+.sizes{display:grid;grid-template-columns:auto 52px 52px;gap:8px 8px;align-items:center;justify-content:start}
+.sizes span{font-size:.9rem;color:var(--muted);padding-right:6px}
+.sizes button{justify-content:center;font-size:1.2rem;padding:6px}
+.tip{margin:0;font-size:.82rem;color:var(--muted);max-width:62ch}
+.stageEdit{position:absolute;right:10px;bottom:10px;min-height:38px;background:rgba(8,12,20,.82);border-color:rgba(255,255,255,.25);font-size:.85rem}
 .sl{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:.9rem}
 .sl input{flex:1;min-width:140px;accent-color:var(--strike)}
 .sl output{font-family:var(--f-score);font-size:1.3rem;width:2.2em;text-align:right;font-variant-numeric:tabular-nums}
@@ -129,8 +134,9 @@ details p{font-size:.88rem;color:var(--muted);max-width:62ch;margin:.6em 0 0}
       </div>
       <div class="pc"><em>球數</em><strong id="pcount">0</strong></div>
     </div>
-    <div class="hint" id="hint" hidden>拖曳框框移動，拖四個角調整大小</div>
+    <div class="hint" id="hint" hidden>四個角可各自拖動，拖中間整個移動</div>
     <div class="call" id="call"></div>
+    <button class="stageEdit" id="stageEdit" type="button">調整框</button>
   </div>
 
   <div class="note" id="note" hidden></div>
@@ -154,10 +160,14 @@ details p{font-size:.88rem;color:var(--muted);max-width:62ch;margin:.6em 0 0}
     <div class="label">好球帶</div>
     <div class="btns">
       <button id="btnEdit" type="button">調整好球帶</button>
-      <button id="zMinus" type="button" aria-label="好球帶縮小">縮小 −</button>
-      <button id="zPlus" type="button" aria-label="好球帶放大">放大 ＋</button>
       <button id="zReset" type="button">回復預設</button>
     </div>
+    <div class="sizes">
+      <span>整體</span><button id="zMinus" type="button" aria-label="整體縮小">−</button><button id="zPlus" type="button" aria-label="整體放大">＋</button>
+      <span>寬度</span><button id="zW0" type="button" aria-label="變窄">−</button><button id="zW1" type="button" aria-label="加寬">＋</button>
+      <span>高度</span><button id="zH0" type="button" aria-label="變矮">−</button><button id="zH1" type="button" aria-label="加高">＋</button>
+    </div>
+    <p class="tip">按「調整好球帶」後，四個角可以各自拖到任何位置，斜角拍攝時也能貼齊實際的框。拖框的中間可以整個移動。</p>
     <div class="label">其他</div>
     <div class="btns">
       <button id="btnVoice" type="button" class="on">語音喊判：開</button>
@@ -225,8 +235,32 @@ const pctx=proc.getContext('2d',{willReadFrequently:true});
 
 /* ---------- state ---------- */
 const DEFAULT_ZONE={x:.34,y:.40,w:.32,h:.34};
-let zone={...DEFAULT_ZONE};
-try{const z=JSON.parse(localStorage.getItem('kz-zone'));if(z&&z.w>0.03&&z.h>0.03)zone=z;}catch(e){}
+// 好球帶是四個角可各自拖曳的四邊形（左上、右上、右下、左下），從任何角度拍都能貼合實際的框。
+const rectQuad=z=>[[z.x,z.y],[z.x+z.w,z.y],[z.x+z.w,z.y+z.h],[z.x,z.y+z.h]];
+let quad=rectQuad(DEFAULT_ZONE),zone={...DEFAULT_ZONE},HM=null,HI=null;
+try{const q=JSON.parse(localStorage.getItem('kz-quad'));if(Array.isArray(q)&&q.length===4&&q.every(c=>c.length===2&&c.every(Number.isFinite)))quad=q;}catch(e){}
+function sq2quad(q){
+  const [x0,y0]=q[0],[x1,y1]=q[1],[x2,y2]=q[2],[x3,y3]=q[3];
+  const dx1=x1-x2,dx2=x3-x2,dx3=x0-x1+x2-x3,dy1=y1-y2,dy2=y3-y2,dy3=y0-y1+y2-y3;
+  let g=0,h=0;
+  if(Math.abs(dx3)>1e-12||Math.abs(dy3)>1e-12){const den=dx1*dy2-dy1*dx2;if(Math.abs(den)>1e-12){g=(dx3*dy2-dy3*dx2)/den;h=(dx1*dy3-dy1*dx3)/den;}}
+  return[x1-x0+g*x1,x3-x0+h*x3,x0,y1-y0+g*y1,y3-y0+h*y3,y0,g,h,1];
+}
+function inv3(m){
+  const[a,b,c,d,e,f,g,h,i]=m,A=e*i-f*h,B=-(d*i-f*g),C=d*h-e*g,det=a*A+b*B+c*C;
+  if(Math.abs(det)<1e-12)return null;
+  return[A/det,-(b*i-c*h)/det,(b*f-c*e)/det,B/det,(a*i-c*g)/det,-(a*f-c*d)/det,C/det,-(a*h-b*g)/det,(a*e-b*d)/det];
+}
+function app(m,x,y){const w=m[6]*x+m[7]*y+m[8];return[(m[0]*x+m[1]*y+m[2])/w,(m[3]*x+m[4]*y+m[5])/w];}
+function syncZone(){
+  const xs=quad.map(c=>c[0]),ys=quad.map(c=>c[1]);
+  const x=Math.min(...xs),y=Math.min(...ys);
+  zone={x,y,w:Math.max(...xs)-x,h:Math.max(...ys)-y};
+  HM=sq2quad(quad);HI=inv3(HM);
+}
+function toUV(x,y){return HI?app(HI,x,y):[(x-zone.x)/zone.w,(y-zone.y)/zone.h];}
+function fromUV(u,v){return app(HM,u,v);}
+syncZone();
 let sens=60,editing=false,voice=true,view='catcher';
 try{const v=localStorage.getItem('kz-view');if(v==='pitcher')view=v;}catch(e){}
 try{const v=localStorage.getItem('kz-sens');if(v!==null){sens=+v;$('#sens').value=sens;$('#sensOut').textContent=sens;}}catch(e){}
@@ -328,14 +362,15 @@ function analyze(t){
 
 /* ---------- judging ---------- */
 function isStrike(p){
-  const rx=p.rpx/p.W,ry=p.rpx/p.H;
-  const cx=Math.max(zone.x,Math.min(p.x,zone.x+zone.w));
-  const cy=Math.max(zone.y,Math.min(p.y,zone.y+zone.h));
-  const dx=(p.x-cx)/rx,dy=(p.y-cy)/ry;
-  return dx*dx+dy*dy<=1;
+  const [u,v]=toUV(p.x,p.y);
+  const top=Math.hypot((quad[1][0]-quad[0][0])*p.W,(quad[1][1]-quad[0][1])*p.H),bot=Math.hypot((quad[2][0]-quad[3][0])*p.W,(quad[2][1]-quad[3][1])*p.H);
+  const lef=Math.hypot((quad[3][0]-quad[0][0])*p.W,(quad[3][1]-quad[0][1])*p.H),rig=Math.hypot((quad[2][0]-quad[1][0])*p.W,(quad[2][1]-quad[1][1])*p.H);
+  const ru=p.rpx/Math.max(1,(top+bot)/2),rv=p.rpx/Math.max(1,(lef+rig)/2);
+  const du=Math.max(0,-u,u-1)/ru,dv=Math.max(0,-v,v-1)/rv;
+  return du*du+dv*dv<=1;
 }
 function where(p){
-  const u=(p.x-zone.x)/zone.w,v=(p.y-zone.y)/zone.h;
+  const [u,v]=toUV(p.x,p.y);
   const out=[];
   if(v<0)out.push('偏高');else if(v>1)out.push('偏低');
   if(u<0)out.push('偏左');else if(u>1)out.push('偏右');
@@ -345,7 +380,7 @@ function where(p){
 }
 function callPitch(p,trail){
   const strike=isStrike(p);
-  const u=(p.x-zone.x)/zone.w,v=(p.y-zone.y)/zone.h;
+  const [u,v]=toUV(p.x,p.y);
   lastTrail={pts:trail.map(q=>({x:q.x,y:q.y})),hit:{x:p.x,y:p.y,rx:p.rpx/p.W,ry:p.rpx/p.H},strike,t:performance.now()};
   clipCalls++;
   record(strike,{u,v},where(p),src&&src.kind==='demo');
@@ -425,16 +460,22 @@ function drawChart(){
 function drawOverlay(){
   const W=ov.width,H=ov.height,dpr=W/(parseFloat(stage.style.width)||W);
   octx.clearRect(0,0,W,H);
-  const zx=zone.x*W,zy=zone.y*H,zw=zone.w*W,zh=zone.h*H;
-  octx.fillStyle='rgba(0,0,0,0.22)';
-  octx.fillRect(0,0,W,zy);octx.fillRect(0,zy+zh,W,H-zy-zh);octx.fillRect(0,zy,zx,zh);octx.fillRect(zx+zw,zy,W-zx-zw,zh);
-  octx.setLineDash([6*dpr,6*dpr]);octx.strokeStyle='rgba(246,243,234,0.45)';octx.lineWidth=1.2*dpr;
-  for(let i=1;i<3;i++){octx.beginPath();octx.moveTo(zx+zw*i/3,zy);octx.lineTo(zx+zw*i/3,zy+zh);octx.stroke();octx.beginPath();octx.moveTo(zx,zy+zh*i/3);octx.lineTo(zx+zw,zy+zh*i/3);octx.stroke();}
+  const P=(u,v)=>{const[x,y]=fromUV(u,v);return[x*W,y*H];};
+  octx.fillStyle='rgba(0,0,0,0.25)';octx.beginPath();octx.rect(0,0,W,H);
+  quad.forEach((c,i)=>i?octx.lineTo(c[0]*W,c[1]*H):octx.moveTo(c[0]*W,c[1]*H));octx.closePath();octx.fill('evenodd');
+  octx.setLineDash([6*dpr,6*dpr]);octx.strokeStyle='rgba(246,243,234,0.5)';octx.lineWidth=1.2*dpr;
+  for(let i=1;i<3;i++){
+    let a=P(i/3,0),b=P(i/3,1);octx.beginPath();octx.moveTo(a[0],a[1]);octx.lineTo(b[0],b[1]);octx.stroke();
+    a=P(0,i/3);b=P(1,i/3);octx.beginPath();octx.moveTo(a[0],a[1]);octx.lineTo(b[0],b[1]);octx.stroke();
+  }
   octx.setLineDash([]);
-  octx.strokeStyle=editing?'#ffb21e':'#f6f3ea';octx.lineWidth=3*dpr;octx.strokeRect(zx,zy,zw,zh);
+  octx.strokeStyle=editing?'#ffb21e':'#f6f3ea';octx.lineWidth=3*dpr;octx.beginPath();
+  quad.forEach((c,i)=>i?octx.lineTo(c[0]*W,c[1]*H):octx.moveTo(c[0]*W,c[1]*H));octx.closePath();octx.stroke();
   if(editing){
-    octx.fillStyle='#ffb21e';
-    for(const [hx,hy] of [[zx,zy],[zx+zw,zy],[zx,zy+zh],[zx+zw,zy+zh]]){octx.beginPath();octx.arc(hx,hy,9*dpr,0,Math.PI*2);octx.fill();}
+    quad.forEach((c,i)=>{
+      octx.fillStyle=i===drag?.i?'#fff':'#ffb21e';octx.strokeStyle='#0c131d';octx.lineWidth=2*dpr;
+      octx.beginPath();octx.arc(c[0]*W,c[1]*H,13*dpr,0,Math.PI*2);octx.fill();octx.stroke();
+    });
   }
   if(lastTrail){
     const age=performance.now()-lastTrail.t;
@@ -453,28 +494,36 @@ function drawOverlay(){
 /* ---------- zone editing ---------- */
 let drag=null;
 function norm(e){const b=ov.getBoundingClientRect();return{x:(e.clientX-b.left)/b.width,y:(e.clientY-b.top)/b.height,bw:b.width,bh:b.height};}
+function inQuad(x,y){const[u,v]=toUV(x,y);return u>=0&&u<=1&&v>=0&&v<=1;}
 ov.addEventListener('pointerdown',e=>{
   if(!editing)return;
-  const p=norm(e),tol=28;
-  const corners=[['tl',zone.x,zone.y],['tr',zone.x+zone.w,zone.y],['bl',zone.x,zone.y+zone.h],['br',zone.x+zone.w,zone.y+zone.h]];
-  for(const [k,cx,cy] of corners){if(Math.hypot((p.x-cx)*p.bw,(p.y-cy)*p.bh)<tol){drag={k,start:p,z:{...zone}};break;}}
-  if(!drag&&p.x>zone.x&&p.x<zone.x+zone.w&&p.y>zone.y&&p.y<zone.y+zone.h)drag={k:'move',start:p,z:{...zone}};
+  const p=norm(e),tol=36;let best=-1,bd=1e9;
+  quad.forEach((c,i)=>{const d=Math.hypot((p.x-c[0])*p.bw,(p.y-c[1])*p.bh);if(d<bd){bd=d;best=i;}});
+  if(bd<tol)drag={i:best,start:p,q:quad.map(c=>[...c])};
+  else if(inQuad(p.x,p.y))drag={i:-1,start:p,q:quad.map(c=>[...c])};
   if(drag){ov.setPointerCapture(e.pointerId);e.preventDefault();}
 });
 ov.addEventListener('pointermove',e=>{
   if(!drag)return;
-  const p=norm(e),dx=p.x-drag.start.x,dy=p.y-drag.start.y,z=drag.z,m=0.04;
-  let {x,y,w,h}=z;
-  if(drag.k==='move'){x=Math.min(1-w,Math.max(0,z.x+dx));y=Math.min(1-h,Math.max(0,z.y+dy));}
-  else{
-    let l=z.x,t=z.y,r=z.x+z.w,b=z.y+z.h;
-    if(drag.k[1]==='l')l=Math.min(r-m,Math.max(0,l+dx));else r=Math.max(l+m,Math.min(1,r+dx));
-    if(drag.k[0]==='t')t=Math.min(b-m,Math.max(0,t+dy));else b=Math.max(t+m,Math.min(1,b+dy));
-    x=l;y=t;w=r-l;h=b-t;
+  const p=norm(e),dx=p.x-drag.start.x,dy=p.y-drag.start.y,cl=v=>Math.min(1,Math.max(0,v));
+  if(drag.i<0){
+    const xs=drag.q.map(c=>c[0]),ys=drag.q.map(c=>c[1]);
+    const mx=Math.min(Math.max(dx,-Math.min(...xs)),1-Math.max(...xs)),my=Math.min(Math.max(dy,-Math.min(...ys)),1-Math.max(...ys));
+    quad=drag.q.map(c=>[c[0]+mx,c[1]+my]);
+  }else{
+    const nq=drag.q.map(c=>[...c]);nq[drag.i]=[cl(drag.q[drag.i][0]+dx),cl(drag.q[drag.i][1]+dy)];
+    if(convex(nq))quad=nq;
   }
-  zone={x,y,w,h};
+  syncZone();e.preventDefault();
 });
-const endDrag=()=>{if(drag){drag=null;try{localStorage.setItem('kz-zone',JSON.stringify(zone));}catch(e){}}};
+function convex(q){
+  let sign=0;
+  for(let i=0;i<4;i++){const a=q[i],b=q[(i+1)%4],c=q[(i+2)%4];
+    const cr=(b[0]-a[0])*(c[1]-b[1])-(b[1]-a[1])*(c[0]-b[0]);
+    if(Math.abs(cr)<1e-6)return false;const sg=Math.sign(cr);if(!sign)sign=sg;else if(sg!==sign)return false;}
+  return true;
+}
+const endDrag=()=>{if(drag){drag=null;saveZone();}};
 ov.addEventListener('pointerup',endDrag);ov.addEventListener('pointercancel',endDrag);
 
 /* ---------- sources ---------- */
@@ -567,7 +616,7 @@ function scenePitcher(ball){
   for(let x=nx;x<=nx+nw;x+=12){c.beginPath();c.moveTo(x,ny);c.lineTo(x,ny+nh);c.stroke();}
   for(let y=ny;y<=ny+nh;y+=12){c.beginPath();c.moveTo(nx,y);c.lineTo(nx+nw,y);c.stroke();}
   c.strokeStyle='#e9e3d4';c.lineWidth=3;c.strokeRect(nx,ny,nw,nh);
-  c.strokeStyle='#ffb21e';c.lineWidth=2;c.strokeRect(zone.x*DW,zone.y*DH,zone.w*DW,zone.h*DH);
+  c.strokeStyle='#ffb21e';c.lineWidth=2;c.beginPath();quad.forEach((q,i)=>i?c.lineTo(q[0]*DW,q[1]*DH):c.moveTo(q[0]*DW,q[1]*DH));c.closePath();c.stroke();
   if(ball){c.fillStyle='#f4f1ea';c.beginPath();c.arc(ball.x,ball.y,ball.r,0,Math.PI*2);c.fill();
     if(ball.r>6){c.strokeStyle='#d23b2f';c.lineWidth=Math.max(1,ball.r/9);c.beginPath();c.arc(ball.x-ball.r*0.9,ball.y,ball.r*0.7,-0.9,0.9);c.stroke();}}
 }
@@ -576,7 +625,7 @@ function demoPitch(){
   stopAll();note('');
   setSource(demoCv,DW,DH,'demo');
   const tu=-0.25+Math.random()*1.5,tv=-0.25+Math.random()*1.5;
-  const tx=(zone.x+zone.w*tu)*DW,ty=(zone.y+zone.h*tv)*DH;
+  const [tnx,tny]=fromUV(tu,tv),tx=tnx*DW,ty=tny*DH;
   const P=view==='pitcher',F=12,frames=[];
   const sx=P?DW*0.72:DW/2+10,sy=P?DH*0.62:DH*0.27,endR=P?5:22;
   for(let i=0;i<6;i++)frames.push(null);
@@ -606,21 +655,31 @@ function setView(v){
 $('#vCatcher').addEventListener('click',()=>setView('catcher'));
 $('#vPitcher').addEventListener('click',()=>setView('pitcher'));
 syncView();
-function saveZone(){try{localStorage.setItem('kz-zone',JSON.stringify(zone));}catch(_){}}
-function scaleZone(f){
-  const cx=zone.x+zone.w/2,cy=zone.y+zone.h/2;
-  const w=Math.min(0.98,Math.max(0.04,zone.w*f)),h=Math.min(0.98,Math.max(0.04,zone.h*f));
-  zone={w,h,x:Math.min(1-w,Math.max(0,cx-w/2)),y:Math.min(1-h,Math.max(0,cy-h/2))};saveZone();
+function saveZone(){try{localStorage.setItem('kz-quad',JSON.stringify(quad));}catch(_){}}
+function scaleZone(fx,fy){
+  const cx=quad.reduce((a,c)=>a+c[0],0)/4,cy=quad.reduce((a,c)=>a+c[1],0)/4;
+  const nq=quad.map(c=>[cx+(c[0]-cx)*fx,cy+(c[1]-cy)*fy]);
+  const xs=nq.map(c=>c[0]),ys=nq.map(c=>c[1]);
+  if(Math.max(...xs)-Math.min(...xs)<0.03||Math.max(...ys)-Math.min(...ys)<0.03)return;
+  if(Math.min(...xs)<0||Math.max(...xs)>1||Math.min(...ys)<0||Math.max(...ys)>1)return;
+  quad=nq;syncZone();saveZone();
 }
-$('#zPlus').addEventListener('click',()=>scaleZone(1.1));
-$('#zMinus').addEventListener('click',()=>scaleZone(1/1.1));
-$('#zReset').addEventListener('click',()=>{zone={...DEFAULT_ZONE};saveZone();});
-$('#btnEdit').addEventListener('click',e=>{
-  editing=!editing;e.currentTarget.classList.toggle('on',editing);
-  e.currentTarget.textContent=editing?'完成，鎖定好球帶':'調整好球帶';
+$('#zPlus').addEventListener('click',()=>scaleZone(1.1,1.1));
+$('#zMinus').addEventListener('click',()=>scaleZone(1/1.1,1/1.1));
+$('#zW1').addEventListener('click',()=>scaleZone(1.08,1));
+$('#zW0').addEventListener('click',()=>scaleZone(1/1.08,1));
+$('#zH1').addEventListener('click',()=>scaleZone(1,1.08));
+$('#zH0').addEventListener('click',()=>scaleZone(1,1/1.08));
+$('#zReset').addEventListener('click',()=>{quad=rectQuad(DEFAULT_ZONE);syncZone();saveZone();});
+function toggleEdit(){
+  editing=!editing;const be=$('#btnEdit');be.classList.toggle('on',editing);
+  be.textContent=editing?'完成，鎖定好球帶':'調整好球帶';
   $('#hint').hidden=!editing;stage.style.cursor=editing?'move':'';
-  if(!editing){try{localStorage.setItem('kz-zone',JSON.stringify(zone));}catch(_){}}
-});
+  if(!editing)saveZone();
+  $('#stageEdit').textContent=editing?'完成':'調整框';$('#stageEdit').classList.toggle('on',editing);
+}
+$('#btnEdit').addEventListener('click',toggleEdit);
+$('#stageEdit').addEventListener('click',toggleEdit);
 $('#btnVoice').addEventListener('click',e=>{voice=!voice;e.currentTarget.classList.toggle('on',voice);e.currentTarget.textContent='語音喊判：'+(voice?'開':'關');});
 $('#sens').addEventListener('input',e=>{sens=+e.target.value;$('#sensOut').textContent=sens;try{localStorage.setItem('kz-sens',sens);}catch(_){}});
 $('#mS').addEventListener('click',()=>record(true,null,null,false));
