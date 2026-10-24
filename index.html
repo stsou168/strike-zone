@@ -82,6 +82,11 @@ button.s{border-color:color-mix(in srgb,var(--strike) 60%,var(--line));color:var
 button.b{border-color:color-mix(in srgb,var(--ball) 60%,var(--line));color:var(--ball)}
 .filebtn input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
 .filebtn{position:relative}
+.seg{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.seg button{display:grid;justify-items:start;text-align:left;gap:2px;padding:10px 12px}
+.seg button small{font-size:.75rem;font-weight:400;color:var(--muted)}
+.seg button[aria-checked="true"]{background:color-mix(in srgb,var(--strike) 18%,#1d2a3d);border-color:var(--strike)}
+.seg button[aria-checked="true"] small{color:var(--fg)}
 .sl{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:.9rem}
 .sl input{flex:1;min-width:140px;accent-color:var(--strike)}
 .sl output{font-family:var(--f-score);font-size:1.3rem;width:2.2em;text-align:right;font-variant-numeric:tabular-nums}
@@ -141,9 +146,20 @@ details p{font-size:.88rem;color:var(--muted);max-width:62ch;margin:.6em 0 0}
   </section>
 
   <section class="panel">
-    <div class="label">設定</div>
+    <div class="label">鏡頭位置</div>
+    <div class="seg" role="radiogroup" aria-label="鏡頭位置">
+      <button id="vCatcher" type="button" role="radio">捕手後方<small>鏡頭朝投手，球越飛越近</small></button>
+      <button id="vPitcher" type="button" role="radio">投手後方<small>鏡頭朝目標，適合室內短距離</small></button>
+    </div>
+    <div class="label">好球帶</div>
     <div class="btns">
       <button id="btnEdit" type="button">調整好球帶</button>
+      <button id="zMinus" type="button" aria-label="好球帶縮小">縮小 −</button>
+      <button id="zPlus" type="button" aria-label="好球帶放大">放大 ＋</button>
+      <button id="zReset" type="button">回復預設</button>
+    </div>
+    <div class="label">其他</div>
+    <div class="btns">
       <button id="btnVoice" type="button" class="on">語音喊判：開</button>
     </div>
     <label class="sl" for="sens">偵測靈敏度
@@ -164,7 +180,7 @@ details p{font-size:.88rem;color:var(--muted);max-width:62ch;margin:.6em 0 0}
   </section>
 
   <section class="panel">
-    <div class="label">落點圖（從捕手後方看）</div>
+    <div class="label" id="chartLabel">落點圖（從鏡頭方向看）</div>
     <div class="chartwrap">
       <canvas id="chart" width="440" height="528"></canvas>
       <div style="display:grid;gap:12px;min-width:0">
@@ -182,10 +198,17 @@ details p{font-size:.88rem;color:var(--muted);max-width:62ch;margin:.6em 0 0}
   <section class="panel">
     <details>
       <summary>怎麼架手機</summary>
+      <p style="color:var(--fg);margin-top:.6em"><b>捕手後方</b>（戶外、距離夠）</p>
       <ol>
         <li>在捕手位置放一張網子或軟墊當「本壘」，手機架在網子正後方約 1 公尺、腰的高度，鏡頭朝向投手。</li>
         <li>請孩子先站在打擊位置，按「調整好球帶」，把框拖到膝蓋上緣到胸口、寬度約等於本壘板（43 公分）。按一下就鎖定。</li>
         <li>投手距離約 10 至 14 公尺。球打到網子時，程式抓球最靠近鏡頭的位置判好壞。誤判就按「改判上一球」。</li>
+      </ol>
+      <p style="color:var(--fg)"><b>投手後方</b>（室內、距離有限）</p>
+      <ol>
+        <li>在牆上或網子上用膠帶貼出好球帶方框，大小依孩子身高，寬約 43 公分、高約膝蓋到胸口。</li>
+        <li>手機架在投手斜後方約 1 公尺、胸口高度，鏡頭對準膠帶框。架穩，不要手拿。投手的身體盡量不要擋住框。</li>
+        <li>按「投手後方」，再按「調整好球帶」，把畫面上的框對齊牆上的膠帶框。也可以用「放大」「縮小」快速調整。投球距離 4 到 8 公尺都可以。</li>
       </ol>
       <p>光線越亮越準，背景不要有人走動。如果一直漏判就把靈敏度調高；一直亂判就調低。球完全偏出框外很遠時可能不會被偵測，請用手動按鈕。</p>
     </details>
@@ -204,7 +227,8 @@ const pctx=proc.getContext('2d',{willReadFrequently:true});
 const DEFAULT_ZONE={x:.34,y:.40,w:.32,h:.34};
 let zone={...DEFAULT_ZONE};
 try{const z=JSON.parse(localStorage.getItem('kz-zone'));if(z&&z.w>0.03&&z.h>0.03)zone=z;}catch(e){}
-let sens=60,editing=false,voice=true;
+let sens=60,editing=false,voice=true,view='catcher';
+try{const v=localStorage.getItem('kz-view');if(v==='pitcher')view=v;}catch(e){}
 try{const v=localStorage.getItem('kz-sens');if(v!==null){sens=+v;$('#sens').value=sens;$('#sensOut').textContent=sens;}}catch(e){}
 let src=null,stream=null,loopId=0,demoTimer=null,lastTrail=null,clipCalls=0;
 let G=fresh();const hist=[];
@@ -214,7 +238,7 @@ function snap(){hist.push(JSON.stringify(G));if(hist.length>80)hist.shift();}
 /* ---------- source & sizing ---------- */
 function setSource(el,w,h,kind){
   src={el,w,h,kind};
-  proc.width=192;proc.height=Math.max(64,Math.round(192*h/w));
+  const PW=view==='pitcher'?384:192;proc.width=PW;proc.height=Math.max(64,Math.round(PW*h/w));
   resetDet();fit();
   const st=$('#status');st.className='status '+(kind==='demo'?'demo':'live');
   $('#statusText').textContent=kind==='demo'?'示範模式':kind==='camera'?'即時偵測中':'分析影片中';
@@ -236,14 +260,15 @@ const det={prev:null,track:[],miss:0,cool:-1};
 function resetDet(){det.prev=null;det.track=[];det.miss=0;det.cool=-1;}
 
 // Pure blob finder: frame difference inside an ROI around the zone, keep ball-sized blobs.
-function findBlobs(g,prev,W,H,z,s){
+function findBlobs(g,prev,W,H,z,s,v){
   const N=W*H,thr=70-s*0.5;
   const x0=Math.max(0,Math.floor((z.x-z.w*0.6)*W)),x1=Math.min(W-1,Math.ceil((z.x+z.w*1.6)*W));
   const y0=Math.max(0,Math.floor((z.y-z.h*0.6)*H)),y1=Math.min(H-1,Math.ceil((z.y+z.h*1.6)*H));
   const mask=new Uint8Array(N);let cnt=0;
   for(let i=0;i<N;i++){if(Math.abs(g[i]-prev[i])>thr){mask[i]=1;cnt++;}}
   if(cnt>N*0.25)return{shake:true,blobs:[]};
-  const minA=Math.max(4,N*(0.00045-s*0.000003)),maxA=N*0.05;
+  const minA=v==='pitcher'?Math.max(3,N*(0.00008-s*0.0000006)):Math.max(4,N*(0.00045-s*0.000003));
+  const maxA=N*(v==='pitcher'?0.012:0.05);
   const blobs=[],stack=[];
   for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){
     const i0=y*W+x;if(mask[i0]!==1)continue;
@@ -274,7 +299,7 @@ function analyze(t){
   for(let i=0,j=0;i<N;i++,j+=4)g[i]=(d[j]*77+d[j+1]*150+d[j+2]*29)>>8;
   const prev=det.prev;det.prev=g;
   if(!prev||t<det.cool||editing)return;
-  const r=findBlobs(g,prev,W,H,zone,sens);
+  const r=findBlobs(g,prev,W,H,zone,sens,view);
   if(r.shake)return;
   let pick=null;
   if(r.blobs.length){
@@ -289,8 +314,11 @@ function analyze(t){
     if(++det.miss>=3){
       const tr=det.track;det.track=[];det.miss=0;
       const maxA=Math.max(...tr.map(p=>p.a));
-      if(tr.length>=2||maxA>=r.minA*2){
-        const hit=tr.find(p=>p.a>=maxA*0.75);
+      if(tr.length>=2||(view!=='pitcher'&&maxA>=r.minA*2)){
+        // 捕手後方：球越來越大，到網子時最大。投手後方：球越來越小，到目標時最小。
+        let hit;
+        if(view==='pitcher'){const mn=Math.min(...tr.map(p=>p.a));hit=tr.find(p=>p.a<=mn*1.3);}
+        else hit=tr.find(p=>p.a>=maxA*0.75);
         det.cool=t+1500;
         callPitch(hit,tr);
       }
@@ -514,6 +542,7 @@ $('#btnCam').addEventListener('click',startCamera);
 const DW=540,DH=720;
 function scene(ball){
   const c=dctx;
+  if(view==='pitcher')return scenePitcher(ball);
   const sky=c.createLinearGradient(0,0,0,DH);sky.addColorStop(0,'#1d2b3a');sky.addColorStop(.42,'#2c4a3a');sky.addColorStop(1,'#203826');
   c.fillStyle=sky;c.fillRect(0,0,DW,DH);
   c.fillStyle='#8a5a37';c.beginPath();c.ellipse(DW/2,DH*0.36,70,14,0,0,Math.PI*2);c.fill();
@@ -527,17 +556,34 @@ function scene(ball){
     if(ball.r>6){c.strokeStyle='#d23b2f';c.lineWidth=Math.max(1,ball.r/9);c.beginPath();c.arc(ball.x-ball.r*0.9,ball.y,ball.r*0.7,-0.9,0.9);c.stroke();c.beginPath();c.arc(ball.x+ball.r*0.9,ball.y,ball.r*0.7,Math.PI-0.9,Math.PI+0.9);c.stroke();}
   }
 }
+function scenePitcher(ball){
+  const c=dctx;
+  c.fillStyle='#2a2f38';c.fillRect(0,0,DW,DH);
+  const fl=c.createLinearGradient(0,DH*0.62,0,DH);fl.addColorStop(0,'#5b4636');fl.addColorStop(1,'#7a5c43');
+  c.fillStyle=fl;c.fillRect(0,DH*0.62,DW,DH*0.38);
+  const nx=Math.max(0,zone.x-zone.w*0.7)*DW,ny=Math.max(0,zone.y-zone.h*0.5)*DH,nw=Math.min(1,zone.x+zone.w*1.7)*DW-nx,nh=Math.min(1,zone.y+zone.h*1.4)*DH-ny;
+  c.fillStyle='#3a414d';c.fillRect(nx,ny,nw,nh);
+  c.strokeStyle='rgba(220,225,230,0.18)';c.lineWidth=1;
+  for(let x=nx;x<=nx+nw;x+=12){c.beginPath();c.moveTo(x,ny);c.lineTo(x,ny+nh);c.stroke();}
+  for(let y=ny;y<=ny+nh;y+=12){c.beginPath();c.moveTo(nx,y);c.lineTo(nx+nw,y);c.stroke();}
+  c.strokeStyle='#e9e3d4';c.lineWidth=3;c.strokeRect(nx,ny,nw,nh);
+  c.strokeStyle='#ffb21e';c.lineWidth=2;c.strokeRect(zone.x*DW,zone.y*DH,zone.w*DW,zone.h*DH);
+  if(ball){c.fillStyle='#f4f1ea';c.beginPath();c.arc(ball.x,ball.y,ball.r,0,Math.PI*2);c.fill();
+    if(ball.r>6){c.strokeStyle='#d23b2f';c.lineWidth=Math.max(1,ball.r/9);c.beginPath();c.arc(ball.x-ball.r*0.9,ball.y,ball.r*0.7,-0.9,0.9);c.stroke();}}
+}
 function runDemoScene(){if(!src||src.kind!=='demo'){setSource(demoCv,DW,DH,'demo');}scene(null);}
 function demoPitch(){
   stopAll();note('');
   setSource(demoCv,DW,DH,'demo');
   const tu=-0.25+Math.random()*1.5,tv=-0.25+Math.random()*1.5;
   const tx=(zone.x+zone.w*tu)*DW,ty=(zone.y+zone.h*tv)*DH;
-  const sx=DW/2+10,sy=DH*0.27,F=12;
-  const frames=[];
+  const P=view==='pitcher',F=12,frames=[];
+  const sx=P?DW*0.72:DW/2+10,sy=P?DH*0.62:DH*0.27,endR=P?5:22;
   for(let i=0;i<6;i++)frames.push(null);
-  for(let i=1;i<=F;i++){const s=i/F,k=Math.pow(s,2.2);frames.push({x:sx+(tx-sx)*k,y:sy+(ty-sy)*k,r:2+20*Math.pow(s,3)});}
-  for(let i=1;i<=6;i++)frames.push({x:tx,y:ty+i*i*1.2,r:22});
+  for(let i=1;i<=F;i++){const s=i/F;
+    if(P){const k=1-Math.pow(1-s,1.6);frames.push({x:sx+(tx-sx)*k,y:sy+(ty-sy)*k-Math.sin(s*Math.PI)*DH*0.05,r:36-31*k});}
+    else{const k=Math.pow(s,2.2);frames.push({x:sx+(tx-sx)*k,y:sy+(ty-sy)*k,r:2+20*Math.pow(s,3)});}}
+  for(let i=1;i<=6;i++)frames.push({x:tx,y:ty+i*i*(P?0.5:1.2),r:endR});
   for(let i=0;i<50;i++)frames.push(null);
   let f=0;const id=++loopId;
   demoTimer=setInterval(()=>{
@@ -548,6 +594,27 @@ function demoPitch(){
 $('#btnDemo').addEventListener('click',demoPitch);
 
 /* ---------- controls ---------- */
+function syncView(){
+  $('#vCatcher').setAttribute('aria-checked',view==='catcher');
+  $('#vPitcher').setAttribute('aria-checked',view==='pitcher');
+}
+function setView(v){
+  view=v;syncView();try{localStorage.setItem('kz-view',v);}catch(_){}
+  if(src)setSource(src.el,src.w,src.h,src.kind);
+  if(src&&src.kind==='demo')scene(null);
+}
+$('#vCatcher').addEventListener('click',()=>setView('catcher'));
+$('#vPitcher').addEventListener('click',()=>setView('pitcher'));
+syncView();
+function saveZone(){try{localStorage.setItem('kz-zone',JSON.stringify(zone));}catch(_){}}
+function scaleZone(f){
+  const cx=zone.x+zone.w/2,cy=zone.y+zone.h/2;
+  const w=Math.min(0.98,Math.max(0.04,zone.w*f)),h=Math.min(0.98,Math.max(0.04,zone.h*f));
+  zone={w,h,x:Math.min(1-w,Math.max(0,cx-w/2)),y:Math.min(1-h,Math.max(0,cy-h/2))};saveZone();
+}
+$('#zPlus').addEventListener('click',()=>scaleZone(1.1));
+$('#zMinus').addEventListener('click',()=>scaleZone(1/1.1));
+$('#zReset').addEventListener('click',()=>{zone={...DEFAULT_ZONE};saveZone();});
 $('#btnEdit').addEventListener('click',e=>{
   editing=!editing;e.currentTarget.classList.toggle('on',editing);
   e.currentTarget.textContent=editing?'完成，鎖定好球帶':'調整好球帶';
