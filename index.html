@@ -92,6 +92,14 @@ button.b{border-color:color-mix(in srgb,var(--ball) 60%,var(--line));color:var(-
 .sizes button{justify-content:center;font-size:1.2rem;padding:6px}
 .tip{margin:0;font-size:.82rem;color:var(--muted);max-width:62ch}
 .stageEdit{position:absolute;right:10px;bottom:10px;min-height:38px;background:rgba(8,12,20,.82);border-color:rgba(255,255,255,.25);font-size:.85rem}
+[hidden]{display:none!important}
+.ballrow{display:flex;align-items:center;gap:10px;min-width:0}
+.swatch{flex:none;width:30px;height:30px;border-radius:50%;border:2px dashed var(--muted)}
+.swatch.set{border:2px solid var(--chalk)}
+.ballstate{font-size:.88rem;min-width:0}
+.sheet{position:fixed;inset:0;z-index:20;grid-template-columns:minmax(0,560px);justify-content:center;background:rgba(5,8,14,.86);display:grid;place-items:center;padding:max(16px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(16px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.sheetin{min-width:0;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;display:grid;gap:10px;width:min(560px,100%);max-height:100%;overflow:auto}
+#pickCv{width:100%;height:auto;max-height:55vh;object-fit:contain;border-radius:6px;background:#000;touch-action:none}
 .sl{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:.9rem}
 .sl input{flex:1;min-width:140px;accent-color:var(--strike)}
 .sl output{font-family:var(--f-score);font-size:1.3rem;width:2.2em;text-align:right;font-variant-numeric:tabular-nums}
@@ -140,6 +148,15 @@ details p{font-size:.88rem;color:var(--muted);max-width:62ch;margin:.6em 0 0}
   </div>
 
   <div class="note" id="note" hidden></div>
+  <div class="sheet" id="sheet" hidden>
+    <div class="sheetin">
+      <strong>點一下球的中心</strong>
+      <span class="tip">再用滑桿讓黃色圓圈剛好框住球，只框球不要框到背景。</span>
+      <canvas id="pickCv"></canvas>
+      <label class="sl" for="pickR">圓圈大小<input id="pickR" type="range" min="3" max="300" value="60"></label>
+      <div class="btns"><button class="primary" id="pickOk" type="button">使用這顆球</button><button id="pickCancel" type="button">取消</button></div>
+    </div>
+  </div>
 
   <section class="panel">
     <div class="label">畫面來源</div>
@@ -152,6 +169,16 @@ details p{font-size:.88rem;color:var(--muted);max-width:62ch;margin:.6em 0 0}
   </section>
 
   <section class="panel">
+    <div class="label">登錄球的樣子</div>
+    <div class="ballrow">
+      <span class="swatch" id="swatch" aria-hidden="true"></span>
+      <span id="ballState" class="ballstate">尚未登錄：任何移動的小東西都可能被當成球</span>
+    </div>
+    <div class="btns">
+      <label class="filebtn">拍一張球的照片<input id="ballPhoto" type="file" accept="image/*" capture="environment"></label>
+      <button id="ballFromFrame" type="button">從目前畫面點選球</button>
+      <button id="ballClear" type="button" hidden>清除</button>
+    </div>
     <div class="label">鏡頭位置</div>
     <div class="seg" role="radiogroup" aria-label="鏡頭位置">
       <button id="vCatcher" type="button" role="radio">捕手後方<small>鏡頭朝投手，球越飛越近</small></button>
@@ -264,7 +291,7 @@ syncZone();
 let sens=60,editing=false,voice=true,view='catcher';
 try{const v=localStorage.getItem('kz-view');if(v==='pitcher')view=v;}catch(e){}
 try{const v=localStorage.getItem('kz-sens');if(v!==null){sens=+v;$('#sens').value=sens;$('#sensOut').textContent=sens;}}catch(e){}
-let src=null,stream=null,loopId=0,demoTimer=null,lastTrail=null,clipCalls=0;
+let picking=false,src=null,stream=null,loopId=0,demoTimer=null,lastTrail=null,clipCalls=0;
 let G=fresh();const hist=[];
 function fresh(){return{balls:0,strikes:0,outs:0,k:0,bb:0,pitches:[]};}
 function snap(){hist.push(JSON.stringify(G));if(hist.length>80)hist.shift();}
@@ -272,7 +299,7 @@ function snap(){hist.push(JSON.stringify(G));if(hist.length>80)hist.shift();}
 /* ---------- source & sizing ---------- */
 function setSource(el,w,h,kind){
   src={el,w,h,kind};
-  const PW=view==='pitcher'?384:192;proc.width=PW;proc.height=Math.max(64,Math.round(PW*h/w));
+  const PW=view==='pitcher'?512:192;proc.width=PW;proc.height=Math.max(64,Math.round(PW*h/w));
   resetDet();fit();
   const st=$('#status');st.className='status '+(kind==='demo'?'demo':'live');
   $('#statusText').textContent=kind==='demo'?'示範模式':kind==='camera'?'即時偵測中':'分析影片中';
@@ -290,37 +317,51 @@ function fit(){
 addEventListener('resize',fit);
 
 /* ---------- detector ---------- */
-const det={prev:null,track:[],miss:0,cool:-1};
+const det={prevKey:'',prev:null,track:[],miss:0,cool:-1};
 function resetDet(){det.prev=null;det.track=[];det.miss=0;det.cool=-1;}
 
-// Pure blob finder: frame difference inside an ROI around the zone, keep ball-sized blobs.
-function findBlobs(g,prev,W,H,z,s,v){
-  const N=W*H,thr=70-s*0.5;
-  const x0=Math.max(0,Math.floor((z.x-z.w*0.6)*W)),x1=Math.min(W-1,Math.ceil((z.x+z.w*1.6)*W));
-  const y0=Math.max(0,Math.floor((z.y-z.h*0.6)*H)),y1=Math.min(H-1,Math.ceil((z.y+z.h*1.6)*H));
-  const mask=new Uint8Array(N);let cnt=0;
-  for(let i=0;i<N;i++){if(Math.abs(g[i]-prev[i])>thr){mask[i]=1;cnt++;}}
-  if(cnt>N*0.25)return{shake:true,blobs:[]};
-  const minA=v==='pitcher'?Math.max(3,N*(0.00008-s*0.0000006)):Math.max(4,N*(0.00045-s*0.000003));
-  const maxA=N*(v==='pitcher'?0.012:0.05);
-  const blobs=[],stack=[];
-  for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){
-    const i0=y*W+x;if(mask[i0]!==1)continue;
+// 球的顏色樣本：登錄後，只有「有移動」而且「顏色像這顆球」的像素才算數。
+let ballModel=null;
+try{const m=JSON.parse(localStorage.getItem('kz-ball'));if(m&&Number.isFinite(m.cr))ballModel=m;}catch(e){}
+function matchColor(d,j,m,s){
+  const R=d[j],Gc=d[j+1],B=d[j+2],sum=R+Gc+B+1;
+  if(sum<45)return false;
+  const dc=Math.hypot(R/sum-m.cr,Gc/sum-m.cg),l=sum/m.sum;
+  return dc<m.tol+s*0.0003&&l>0.45&&l<1.8;
+}
+function roiRect(W,H){
+  const x0=Math.max(0,Math.floor((zone.x-zone.w*0.6)*W)),x1=Math.min(W,Math.ceil((zone.x+zone.w*1.6)*W));
+  const y0=Math.max(0,Math.floor((zone.y-zone.h*0.6)*H)),y1=Math.min(H,Math.ceil((zone.y+zone.h*1.6)*H));
+  return{x:x0,y:y0,w:Math.max(1,x1-x0),h:Math.max(1,y1-y0)};
+}
+// 在好球帶周圍的區域裡找「球大小」的移動物體。座標回傳成整個畫面的比例。
+function findBlobs(d,g,prev,R,W,H,s,v,m){
+  const n=R.w*R.h,thr=70-s*0.5,mask=new Uint8Array(n);let cnt=0;
+  for(let i=0;i<n;i++){
+    if(Math.abs(g[i]-prev[i])>thr){cnt++;if(!m||matchColor(d,i*4,m,s))mask[i]=1;}
+  }
+  if(cnt>n*0.3)return{shake:true,blobs:[]};
+  const k=(W/512)*(W/512);
+  const minA=v==='pitcher'?Math.max(3,k*((m?9:16)-s*0.07)):Math.max(4,W*H*((m?0.0003:0.00045)-s*0.000003));
+  const maxA=W*H*(v==='pitcher'?0.012:0.05);
+  const blobs=[],stack=[],rw=R.w,rh=R.h;
+  for(let y=0;y<rh;y++)for(let x=0;x<rw;x++){
+    const i0=y*rw+x;if(mask[i0]!==1)continue;
     mask[i0]=2;stack.push(i0);
     let a=0,sx=0,sy=0,mnx=x,mxx=x,mny=y,mxy=y;
     while(stack.length){
-      const i=stack.pop(),px=i%W,py=(i-px)/W;
+      const i=stack.pop(),px=i%rw,py=(i-px)/rw;
       a++;sx+=px;sy+=py;
       if(px<mnx)mnx=px;if(px>mxx)mxx=px;if(py<mny)mny=py;if(py>mxy)mxy=py;
-      if(px>x0&&mask[i-1]===1){mask[i-1]=2;stack.push(i-1);}
-      if(px<x1&&mask[i+1]===1){mask[i+1]=2;stack.push(i+1);}
-      if(py>y0&&mask[i-W]===1){mask[i-W]=2;stack.push(i-W);}
-      if(py<y1&&mask[i+W]===1){mask[i+W]=2;stack.push(i+W);}
+      if(px>0&&mask[i-1]===1){mask[i-1]=2;stack.push(i-1);}
+      if(px<rw-1&&mask[i+1]===1){mask[i+1]=2;stack.push(i+1);}
+      if(py>0&&mask[i-rw]===1){mask[i-rw]=2;stack.push(i-rw);}
+      if(py<rh-1&&mask[i+rw]===1){mask[i+rw]=2;stack.push(i+rw);}
     }
     if(a<minA||a>maxA)continue;
     const bw=mxx-mnx+1,bh=mxy-mny+1,ar=bw/bh;
     if(a/(bw*bh)<0.15||ar<0.2||ar>5)continue;
-    blobs.push({x:sx/a/W,y:sy/a/H,a,rpx:Math.sqrt(a/Math.PI)*0.6});
+    blobs.push({x:(R.x+sx/a)/W,y:(R.y+sy/a)/H,a,rpx:Math.sqrt(a/Math.PI)*0.6});
   }
   return{shake:false,blobs,minA};
 }
@@ -329,11 +370,12 @@ function analyze(t){
   if(!src)return;
   const W=proc.width,H=proc.height;
   try{pctx.drawImage(src.el,0,0,W,H);}catch(e){return;}
-  const d=pctx.getImageData(0,0,W,H).data,N=W*H,g=new Uint8Array(N);
-  for(let i=0,j=0;i<N;i++,j+=4)g[i]=(d[j]*77+d[j+1]*150+d[j+2]*29)>>8;
-  const prev=det.prev;det.prev=g;
-  if(!prev||t<det.cool||editing)return;
-  const r=findBlobs(g,prev,W,H,zone,sens,view);
+  const R=roiRect(W,H),key=R.x+','+R.y+','+R.w+','+R.h;
+  const d=pctx.getImageData(R.x,R.y,R.w,R.h).data,n=R.w*R.h,g=new Uint8Array(n);
+  for(let i=0,j=0;i<n;i++,j+=4)g[i]=(d[j]*77+d[j+1]*150+d[j+2]*29)>>8;
+  const prev=det.prevKey===key?det.prev:null;det.prev=g;det.prevKey=key;
+  if(!prev||t<det.cool||editing||picking)return;
+  const r=findBlobs(d,g,prev,R,W,H,sens,view,ballModel);
   if(r.shake)return;
   let pick=null;
   if(r.blobs.length){
@@ -589,6 +631,7 @@ $('#btnCam').addEventListener('click',startCamera);
 
 /* ---------- demo pitch (synthetic frames through the same detector) ---------- */
 const DW=540,DH=720;
+function ballColor(){return ballModel?'rgb('+ballModel.rgb.join(',')+')':'#f4f1ea';}
 function scene(ball){
   const c=dctx;
   if(view==='pitcher')return scenePitcher(ball);
@@ -601,7 +644,7 @@ function scene(ball){
   for(let x=0;x<=DW;x+=24){c.beginPath();c.moveTo(x,0);c.lineTo(x,DH);c.stroke();}
   for(let y=0;y<=DH;y+=24){c.beginPath();c.moveTo(0,y);c.lineTo(DW,y);c.stroke();}
   if(ball){
-    c.fillStyle='#f4f1ea';c.beginPath();c.arc(ball.x,ball.y,ball.r,0,Math.PI*2);c.fill();
+    c.fillStyle=ballColor();c.beginPath();c.arc(ball.x,ball.y,ball.r,0,Math.PI*2);c.fill();
     if(ball.r>6){c.strokeStyle='#d23b2f';c.lineWidth=Math.max(1,ball.r/9);c.beginPath();c.arc(ball.x-ball.r*0.9,ball.y,ball.r*0.7,-0.9,0.9);c.stroke();c.beginPath();c.arc(ball.x+ball.r*0.9,ball.y,ball.r*0.7,Math.PI-0.9,Math.PI+0.9);c.stroke();}
   }
 }
@@ -617,7 +660,7 @@ function scenePitcher(ball){
   for(let y=ny;y<=ny+nh;y+=12){c.beginPath();c.moveTo(nx,y);c.lineTo(nx+nw,y);c.stroke();}
   c.strokeStyle='#e9e3d4';c.lineWidth=3;c.strokeRect(nx,ny,nw,nh);
   c.strokeStyle='#ffb21e';c.lineWidth=2;c.beginPath();quad.forEach((q,i)=>i?c.lineTo(q[0]*DW,q[1]*DH):c.moveTo(q[0]*DW,q[1]*DH));c.closePath();c.stroke();
-  if(ball){c.fillStyle='#f4f1ea';c.beginPath();c.arc(ball.x,ball.y,ball.r,0,Math.PI*2);c.fill();
+  if(ball){c.fillStyle=ballColor();c.beginPath();c.arc(ball.x,ball.y,ball.r,0,Math.PI*2);c.fill();
     if(ball.r>6){c.strokeStyle='#d23b2f';c.lineWidth=Math.max(1,ball.r/9);c.beginPath();c.arc(ball.x-ball.r*0.9,ball.y,ball.r*0.7,-0.9,0.9);c.stroke();}}
 }
 function runDemoScene(){if(!src||src.kind!=='demo'){setSource(demoCv,DW,DH,'demo');}scene(null);}
@@ -641,6 +684,83 @@ function demoPitch(){
   },33);
 }
 $('#btnDemo').addEventListener('click',demoPitch);
+
+/* ---------- ball registration ---------- */
+const pickCv=$('#pickCv'),pctx2=pickCv.getContext('2d',{willReadFrequently:true});
+let pickImg=null,pickPt=null;
+function showBallState(){
+  const sw=$('#swatch');
+  if(ballModel){sw.style.background='rgb('+ballModel.rgb.join(',')+')';sw.classList.add('set');
+    $('#ballState').textContent='已登錄：只會偵測這個顏色的球';$('#ballClear').hidden=false;}
+  else{sw.style.background='transparent';sw.classList.remove('set');
+    $('#ballState').textContent='尚未登錄：任何移動的小東西都可能被當成球';$('#ballClear').hidden=true;}
+}
+function openPicker(source,w,h){
+  const sc=Math.min(1,900/Math.max(w,h));
+  pickCv.width=Math.round(w*sc);pickCv.height=Math.round(h*sc);
+  pctx2.drawImage(source,0,0,pickCv.width,pickCv.height);
+  pickImg=pctx2.getImageData(0,0,pickCv.width,pickCv.height);
+  const m=Math.min(pickCv.width,pickCv.height);
+  $('#pickR').max=Math.round(m/2);
+  if(!pickPt){pickPt={x:pickCv.width/2,y:pickCv.height/2,r:Math.round(m*0.22)};}
+  else{pickPt={x:pickCv.width/2,y:pickCv.height/2,r:Math.min(pickPt.r,Math.round(m/2))};}
+  $('#pickR').value=pickPt.r;
+  picking=true;$('#sheet').hidden=false;drawPick();
+}
+function drawPick(){
+  if(!pickImg)return;
+  pctx2.putImageData(pickImg,0,0);
+  const lw=Math.max(2,pickCv.width/250);
+  pctx2.strokeStyle='#ffb21e';pctx2.lineWidth=lw;
+  pctx2.beginPath();pctx2.arc(pickPt.x,pickPt.y,pickPt.r,0,Math.PI*2);pctx2.stroke();
+  pctx2.beginPath();pctx2.moveTo(pickPt.x-6*lw,pickPt.y);pctx2.lineTo(pickPt.x+6*lw,pickPt.y);pctx2.moveTo(pickPt.x,pickPt.y-6*lw);pctx2.lineTo(pickPt.x,pickPt.y+6*lw);pctx2.stroke();
+}
+function pickAt(e){const b=pickCv.getBoundingClientRect();pickPt.x=(e.clientX-b.left)/b.width*pickCv.width;pickPt.y=(e.clientY-b.top)/b.height*pickCv.height;drawPick();}
+pickCv.addEventListener('pointerdown',e=>{pickCv.setPointerCapture(e.pointerId);pickAt(e);});
+pickCv.addEventListener('pointermove',e=>{if(e.buttons||e.pointerType==='touch')pickAt(e);});
+$('#pickR').addEventListener('input',e=>{pickPt.r=+e.target.value;drawPick();});
+function closePicker(){$('#sheet').hidden=true;picking=false;pickImg=null;resetDet();}
+$('#pickCancel').addEventListener('click',closePicker);
+// 由圓圈內的像素算出球的平均顏色與容許範圍
+function buildModel(img,c){
+  const W=img.width,d=img.data,rr=c.r*0.8,px=[];
+  for(let y=Math.max(0,Math.floor(c.y-rr));y<Math.min(img.height,c.y+rr);y++)
+    for(let x=Math.max(0,Math.floor(c.x-rr));x<Math.min(W,c.x+rr);x++){
+      if((x-c.x)**2+(y-c.y)**2>rr*rr)continue;
+      const j=(y*W+x)*4,s=d[j]+d[j+1]+d[j+2]+1;if(s<45)continue;
+      px.push([d[j],d[j+1],d[j+2],s]);
+    }
+  if(px.length<12)return null;
+  px.sort((a,b)=>a[3]-b[3]);
+  const core=px.slice(Math.floor(px.length*0.15),Math.ceil(px.length*0.9));
+  let r=0,g=0,b=0,s=0;for(const p of core){r+=p[0];g+=p[1];b+=p[2];s+=p[3];}
+  const n=core.length;r/=n;g/=n;b/=n;s/=n;
+  const cr=r/(r+g+b+1),cg=g/(r+g+b+1);
+  const ds=core.map(p=>Math.hypot(p[0]/p[3]-cr,p[1]/p[3]-cg)).sort((a,b)=>a-b);
+  const tol=Math.min(0.09,Math.max(0.03,ds[Math.floor(ds.length*0.9)]*1.6));
+  return{cr,cg,sum:s,tol,rgb:[Math.round(r),Math.round(g),Math.round(b)]};
+}
+$('#pickOk').addEventListener('click',()=>{
+  const m=buildModel(pickImg,pickPt);
+  if(!m){note('圓圈裡的畫面太暗或太小，請放大圓圈或換一張亮一點的照片。');return;}
+  ballModel=m;try{localStorage.setItem('kz-ball',JSON.stringify(m));}catch(_){}
+  closePicker();showBallState();note('');
+  if(src&&src.kind==='demo')scene(null);
+});
+$('#ballClear').addEventListener('click',()=>{ballModel=null;try{localStorage.removeItem('kz-ball');}catch(_){}showBallState();});
+$('#ballPhoto').addEventListener('change',async e=>{
+  const f=e.target.files[0];e.target.value='';if(!f)return;
+  const url=URL.createObjectURL(f),im=new Image();
+  im.onload=()=>{openPicker(im,im.naturalWidth,im.naturalHeight);URL.revokeObjectURL(url);};
+  im.onerror=()=>{note('這張照片讀不到，請再拍一次。');URL.revokeObjectURL(url);};
+  im.src=url;
+});
+$('#ballFromFrame').addEventListener('click',()=>{
+  if(!src){note('先開啟相機或選一段影片，再從畫面點選球。');return;}
+  if(src.kind==='clip')video.pause();
+  openPicker(src.el,src.w,src.h);
+});
+showBallState();
 
 /* ---------- controls ---------- */
 function syncView(){
