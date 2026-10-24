@@ -105,6 +105,7 @@ body.full .stage{border-radius:0}
 .zhead{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
 .zpanel .sizes{grid-template-columns:auto 46px 46px}
 .zpanel .form{grid-template-columns:minmax(0,1fr)}
+.stagePA{position:absolute;left:50%;transform:translateX(-50%);bottom:10px;min-height:38px;background:rgba(8,12,20,.82);border-color:rgba(255,255,255,.25);font-size:.85rem;white-space:nowrap}
 .stageEdit{position:absolute;right:10px;bottom:10px;min-height:38px;background:rgba(8,12,20,.82);border-color:rgba(255,255,255,.25);font-size:.85rem}
 [hidden]{display:none!important}
 .ballrow{display:flex;align-items:center;gap:10px;min-width:0}
@@ -118,6 +119,14 @@ body.full .stage{border-radius:0}
 .form label{display:grid;gap:4px;font-size:.85rem;color:var(--muted)}
 .form select,.form input{font:inherit;font-size:1rem;color:var(--fg);background:#1d2a3d;border:1px solid var(--line);border-radius:6px;padding:8px 10px;min-height:42px;width:100%;min-width:0}
 .tip.warn{color:var(--out)}
+.bug .inn strong{font-size:1.5rem}
+.bug .inn em{font-size:.75rem}
+.linewrap{overflow-x:auto}
+table.line{border-collapse:collapse;font-family:var(--f-score);font-size:1.15rem;font-variant-numeric:tabular-nums;min-width:100%}
+table.line th,table.line td{border:1px solid var(--line);padding:2px 8px;text-align:center}
+table.line th{color:var(--muted);font-weight:500}
+table.line td.now{background:color-mix(in srgb,var(--strike) 22%,transparent)}
+table.line td.tot{color:var(--strike)}
 .sl{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:.9rem}
 .sl input{flex:1;min-width:140px;accent-color:var(--strike)}
 .sl output{font-family:var(--f-score);font-size:1.3rem;width:2.2em;text-align:right;font-variant-numeric:tabular-nums}
@@ -154,6 +163,7 @@ details .para{font-size:.88rem;color:var(--muted);max-width:62ch;margin:.6em 0 0
     <canvas id="demo" width="540" height="720"></canvas>
     <canvas id="overlay"></canvas>
     <div class="bug" aria-live="polite">
+      <div class="pc inn"><em id="innTeams">客 : 主</em><strong id="score">0 : 0</strong><em id="inn">1 ▲</em></div>
       <div class="cnt">
         <div class="row"><b>B</b><div class="dots b" id="dB"><span></span><span></span><span></span></div></div>
         <div class="row"><b>S</b><div class="dots s" id="dS"><span></span><span></span></div></div>
@@ -166,6 +176,7 @@ details .para{font-size:.88rem;color:var(--muted);max-width:62ch;margin:.6em 0 0
     <div class="call" id="call"></div>
     <button class="stageEdit" id="stageEdit" type="button">調整框</button>
     <button class="stageFull" id="stageFull" type="button">全螢幕</button>
+    <button class="stagePA" id="stagePA" type="button">下一位打者</button>
   </div>
   </div>
   <aside class="zpanel" id="zpanel" hidden aria-label="調整好球帶">
@@ -193,8 +204,8 @@ details .para{font-size:.88rem;color:var(--muted);max-width:62ch;margin:.6em 0 0
   <div class="note" id="note" hidden></div>
   <div class="sheet" id="sheet" hidden>
     <div class="sheetin">
-      <strong>點一下球的中心</strong>
-      <span class="tip">再用滑桿讓黃色圓圈剛好框住球，只框球不要框到背景。</span>
+      <strong id="pickTitle">點一下球的中心</strong>
+      <span class="tip" id="pickTip">再用滑桿讓黃色圓圈剛好框住球，只框球不要框到背景。</span>
       <canvas id="pickCv"></canvas>
       <label class="sl" for="pickR">圓圈大小<input id="pickR" type="range" min="3" max="300" value="60"></label>
       <div class="btns"><button class="primary" id="pickOk" type="button">使用這顆球</button><button id="pickCancel" type="button">取消</button></div>
@@ -221,6 +232,16 @@ details .para{font-size:.88rem;color:var(--muted);max-width:62ch;margin:.6em 0 0
       <label class="filebtn">拍一張球的照片<input id="ballPhoto" type="file" accept="image/*" capture="environment"></label>
       <button id="ballFromFrame" type="button">從目前畫面點選球</button>
       <button id="ballClear" type="button" hidden>清除</button>
+    </div>
+    <div class="label">登錄球棒（偵測揮棒落空）</div>
+    <div class="ballrow">
+      <span class="swatch" id="batSwatch" aria-hidden="true"></span>
+      <span id="batState" class="ballstate">尚未登錄：揮棒要手動按「揮棒落空」</span>
+    </div>
+    <div class="btns">
+      <label class="filebtn">拍一張球棒的照片<input id="batPhoto" type="file" accept="image/*" capture="environment"></label>
+      <button id="batFromFrame" type="button">從目前畫面點選球棒</button>
+      <button id="batClear" type="button" hidden>清除</button>
     </div>
     <div class="label">鏡頭位置</div>
     <div class="seg" role="radiogroup" aria-label="鏡頭位置">
@@ -269,13 +290,35 @@ details .para{font-size:.88rem;color:var(--muted);max-width:62ch;margin:.6em 0 0
   </section>
 
   <section class="panel">
+    <div class="label">比賽</div>
+    <div class="form">
+      <label for="gInn">局數<select id="gInn"><option value="1">1 局</option><option value="2">2 局</option><option value="3">3 局</option><option value="4">4 局</option><option value="5">5 局</option><option value="6">6 局</option><option value="7">7 局</option><option value="9">9 局</option></select></label>
+      <label for="gMode">換場規則<select id="gMode"><option value="outs">三出局換場</option><option value="pa">每半局打完固定人次換場</option><option value="either">三出局或打完人次，先到就換</option></select></label>
+      <label for="gPA">每半局人次<select id="gPA"><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option><option>9</option></select></label>
+      <label for="gS">幾個好球三振<select id="gS"><option value="2">2 好球</option><option value="3">3 好球</option></select></label>
+      <label for="gB">幾個壞球保送<select id="gB"><option value="3">3 壞球</option><option value="4">4 壞球</option></select></label>
+      <label for="gVmax">球速上限（過濾雜訊）<select id="gVmax"><option value="80">80 km/h（幼童）</option><option value="120">120 km/h（國小）</option><option value="150">150 km/h（國高中）</option><option value="170">170 km/h（成人）</option></select></label>
+    </div>
+    <div class="linewrap"><table class="line" id="line"></table></div>
+    <div class="tip" id="gState"></div>
+    <div class="label">打者結果（程式看不到揮棒，請手動按）</div>
+    <div class="btns">
+      <button class="s" id="eSwing" type="button">揮棒落空</button>
+      <button class="s" id="eFoul" type="button">界外球</button>
+      <button id="eOut" type="button">擊出出局</button>
+      <button class="b" id="e1B" type="button">一壘安打</button>
+      <button class="b" id="e2B" type="button">二壘安打</button>
+      <button class="b" id="e3B" type="button">三壘安打</button>
+      <button class="b" id="eHR" type="button">全壘打</button>
+    </div>
     <div class="label">手動判定與更正</div>
     <div class="btns">
       <button class="s" id="mS" type="button">好球</button>
       <button class="b" id="mB" type="button">壞球</button>
       <button id="mFlip" type="button">改判上一球</button>
       <button id="mUndo" type="button">復原</button>
-      <button id="mNew" type="button">全部重來</button>
+      <button id="mPA" type="button">換下一位打者（球數歸零）</button>
+      <button id="mNew" type="button">新比賽</button>
     </div>
   </section>
 
@@ -306,6 +349,8 @@ details .para{font-size:.88rem;color:var(--muted);max-width:62ch;margin:.6em 0 0
         <div class="step">按「調整框」，把四個角拖到好球帶的四個角（家裡可先用膠帶貼出框）。再填「球的種類」「好球帶實際寬度」「鏡頭到好球帶距離」，球速和過濾雜物都靠這三個數字。</div>
         <div class="step">一定要「登錄球的樣子」：開相機後按「從目前畫面點選球」。後面有捕手、旁邊有打者時，這一步能排除大部分誤判。</div>
       </div>
+      <div class="para" style="color:var(--fg)"><b>揮棒偵測</b></div>
+      <div class="para">請打者拿著球棒站在打擊區，按「從目前畫面點選球棒」圈住球棒一段。之後球到本壘前後，只要球棒掃過好球帶前方，就判「揮棒落空」（不論好壞都算好球）。如果其實有打到球，直接按「界外球」「安打」或「擊出出局」，程式會自動取消剛才的揮棒判定。球和球棒顏色不要太像（白球配竹棒容易混淆，建議用橘色球）。</div>
       <div class="para" style="color:var(--fg)"><b>有捕手、打者時程式怎麼分辨</b></div>
       <div class="para">捕手、打者、裁判的身體和手套比球大很多，會依「球應有的大小」濾掉；顏色和球不同的東西會被顏色過濾掉；捕手回傳球、球撞網掉落是「越來越近」或「停住不動」，不符合投球方向，也不會被判。球要連續出現至少 3 格畫面、軌跡平順、球速合理，才算一球。</div>
       <div class="para">提高準度：用顏色鮮明的球（橘色桌球最好）、背景暗一點、光線亮一點。按「顯示偵測過程」可以看到藍圈（候選物體）和紅圈（球在框上應有的大小），紅圈太小就把手機移近。</div>
@@ -358,7 +403,8 @@ const recede=()=>view!=='catcher';
 try{const v=localStorage.getItem('kz-sens');if(v!==null){sens=+v;$('#sens').value=sens;$('#sensOut').textContent=sens;}}catch(e){}
 let picking=false,src=null,stream=null,loopId=0,demoTimer=null,lastTrail=null,clipCalls=0;
 let G=fresh();const hist=[];
-function fresh(){return{balls:0,strikes:0,outs:0,k:0,bb:0,pitches:[]};}
+function fresh(){return{balls:0,strikes:0,outs:0,k:0,bb:0,h:0,pa:0,inning:1,half:0,bases:[0,0,0],score:[0,0],line:[[],[]],over:false,pitches:[]};}
+function GR(){return cfg.game;}
 function snap(){hist.push(JSON.stringify(G));if(hist.length>80)hist.shift();}
 
 /* ---------- source & sizing ---------- */
@@ -401,6 +447,11 @@ function fit(){
     maxH=wrap.clientHeight-parseFloat(cs.paddingTop)-parseFloat(cs.paddingBottom);
   }else{maxW=wrap.clientWidth;maxH=Math.max(280,window.innerHeight*(a>1.2?0.72:0.64));}
   const w=Math.min(maxW,maxH*a);
+  // iPad 直放卻開著「螢幕方向鎖定」時，畫面和鏡頭方向會對不上
+  if(src&&src.kind==='camera'&&document.body.classList.contains('full')){
+    const scrL=innerWidth>innerHeight,camL=src.w>src.h;
+    if(scrL!==camL&&!fit.warned){fit.warned=true;note('畫面方向和鏡頭方向不一致：如果平板是直放，請從控制中心關閉「螢幕方向鎖定」，畫面就會自動轉正。');}
+  }
   stage.style.width=w+'px';stage.style.height=(w/a)+'px';
   const dpr=Math.min(window.devicePixelRatio||1,2);
   ov.width=Math.round(w*dpr);ov.height=Math.round(w/a*dpr);
@@ -418,11 +469,11 @@ addEventListener('orientationchange',()=>setTimeout(fit,300));
    - 球撞網後彈跳 → 判定後短暫冷卻
 ------------------------------------------------ */
 const BALLS={pingpong:{n:'桌球',d:0.040},tennis:{n:'網球',d:0.067},soft:{n:'軟式棒球',d:0.070},hard:{n:'硬式棒球',d:0.073}};
-let cfg={ball:'pingpong',zoneW:43.2,batH:0,dist:{pitcher:7,side:6,catcher:1.5},debug:false};
-try{const c=JSON.parse(localStorage.getItem('kz-cfg'));if(c&&BALLS[c.ball])cfg={...cfg,...c,dist:{...cfg.dist,...(c.dist||{})}};}catch(e){}
+let cfg={ball:'pingpong',zoneW:43.2,batH:0,vmax:120,game:{innings:3,mode:'outs',paN:5,strikes:3,balls:4},dist:{pitcher:7,side:6,catcher:1.5},debug:false};
+try{const c=JSON.parse(localStorage.getItem('kz-cfg'));if(c&&BALLS[c.ball])cfg={...cfg,...c,dist:{...cfg.dist,...(c.dist||{})},game:{...cfg.game,...(c.game||{})}};}catch(e){}
 function saveCfg(){try{localStorage.setItem('kz-cfg',JSON.stringify(cfg));}catch(_){}}
-const det={key:'',bg:null,tracks:[],cool:-1,blobs:[],lastT:0};
-function resetDet(){det.key='';det.bg=null;det.tracks=[];det.cool=-1;det.blobs=[];}
+const det={key:'',bg:null,tracks:[],cool:-1,blobs:[],lastT:0,swings:[]};
+function resetDet(){det.key='';det.bg=null;det.tracks=[];det.cool=-1;det.blobs=[];det.swings=[];}
 
 // 好球帶在影像上的寬、高（像素），以及球在好球帶平面上應有的直徑
 function zoneEdges(W,H){
@@ -450,12 +501,12 @@ function roiRect(W,H){
   return{x:x0,y:y0,w:Math.max(1,x1-x0),h:Math.max(1,y1-y0)};
 }
 
-function segment(d,g,bg,R,W,H,s,m,d0){
+function segment(d,g,bg,R,W,H,s,m,d0,bm){
   const n=R.w*R.h,thr=Math.max(12,46-s*0.32);
   let mean=0;for(let i=0;i<n;i++)mean+=g[i]-bg[i];mean/=n;
-  const mask=new Uint8Array(n);let cnt=0;
+  const mask=new Uint8Array(n),fga=new Uint8Array(n);let cnt=0;
   for(let i=0;i<n;i++){
-    if(Math.abs(g[i]-bg[i]-mean)>thr){cnt++;if(!m||matchColor(d,i*4,m,s))mask[i]=1;}
+    if(Math.abs(g[i]-bg[i]-mean)>thr){cnt++;fga[i]=1;if(!m||matchColor(d,i*4,m,s))mask[i]=1;}
   }
   // 背景更新：前景像素更新得很慢（靜止的東西幾秒後會被吸收），其餘正常更新
   for(let i=0;i<n;i++){const a=mask[i]?0.01:0.06;bg[i]+=a*(g[i]-bg[i]);}
@@ -466,10 +517,11 @@ function segment(d,g,bg,R,W,H,s,m,d0){
   for(let y=0;y<rh;y++)for(let x=0;x<rw;x++){
     const i0=y*rw+x;if(mask[i0]!==1)continue;
     mask[i0]=2;stack.push(i0);
-    let a=0,sx=0,sy=0,sxx=0,syy=0,sxy=0;
+    let a=0,sx=0,sy=0,sxx=0,syy=0,sxy=0,bx0=x,bx1=x,by0=y,by1=y;
     while(stack.length){
       const i=stack.pop(),px=i%rw,py=(i-px)/rw;
       a++;sx+=px;sy+=py;sxx+=px*px;syy+=py*py;sxy+=px*py;
+      if(px<bx0)bx0=px;if(px>bx1)bx1=px;if(py<by0)by0=py;if(py>by1)by1=py;
       if(a>maxA*1.5){continue;}
       if(px>0&&mask[i-1]===1){mask[i-1]=2;stack.push(i-1);}
       if(px<rw-1&&mask[i+1]===1){mask[i+1]=2;stack.push(i+1);}
@@ -485,9 +537,24 @@ function segment(d,g,bg,R,W,H,s,m,d0){
     if(dm<lo||dm>hi)continue;
     if(major/Math.max(1,minor)>5)continue;
     if(a/(Math.PI/4*major*minor)<0.45)continue;
+    // 孤立檢查：飛行中的球四周是靜止背景；黏在移動的人身上（手、腳、球棒、手套）的就不是球
+    const pad=Math.max(2,Math.round(dm*0.7)),ex0=Math.max(0,bx0-pad),ex1=Math.min(rw-1,bx1+pad),ey0=Math.max(0,by0-pad),ey1=Math.min(rh-1,by1+pad);
+    let ring=0,ringA=0;
+    for(let yy=ey0;yy<=ey1;yy++)for(let xx=ex0;xx<=ex1;xx++){
+      if(xx>=bx0&&xx<=bx1&&yy>=by0&&yy<=by1)continue;
+      ringA++;const kk=yy*rw+xx;if(fga[kk]&&!(bm&&matchColor(d,kk*4,bm,s)))ring++;
+    }
+    if(ringA>0&&ring/ringA>0.3)continue;
     blobs.push({x:R.x+cx,y:R.y+cy,d:dm,a});
   }
-  return{reset:false,blobs};
+  // 揮棒偵測：好球帶前方（框左右各延伸半個框寬）有多少「正在移動、顏色像球棒」的像素
+  let bat=0;
+  if(bm){
+    const zx0=Math.max(0,Math.floor((zone.x-zone.w*0.5)*W)-R.x),zx1=Math.min(rw-1,Math.ceil((zone.x+zone.w*1.5)*W)-R.x);
+    const zy0=Math.max(0,Math.floor((zone.y-zone.h*0.15)*H)-R.y),zy1=Math.min(rh-1,Math.ceil((zone.y+zone.h*1.15)*H)-R.y);
+    for(let yy=zy0;yy<=zy1;yy++)for(let xx=zx0;xx<=zx1;xx++){const kk=yy*rw+xx;if(fga[kk]&&matchColor(d,kk*4,bm,s))bat++;}
+  }
+  return{reset:false,blobs,bat};
 }
 
 function analyze(tms){
@@ -500,7 +567,11 @@ function analyze(tms){
   if(det.key!==key||!det.bg){det.key=key;det.bg=g;det.tracks=[];return;}
   if(t<det.lastT)det.tracks=[];det.lastT=t;
   const d0=expectedD(W,H);
-  const r=segment(d,g,det.bg,R,W,H,sens,ballModel,d0);
+  const r=segment(d,g,det.bg,R,W,H,sens,ballModel,d0,batModel);
+  if(batModel&&!r.reset){
+    const zA=zoneEdges(W,H);const need=Math.max(8,zA.w*zA.h*0.04);
+    if(r.bat>=need){det.swings.push(t);if(det.swings.length>60)det.swings.shift();}
+  }
   det.blobs=r.blobs.map(b=>({x:b.x/W,y:b.y/H,d:b.d/W}));
   if(r.reset||editing||picking){det.tracks=[];return;}
   track(r.blobs,t,W,H,d0);
@@ -580,21 +651,23 @@ function flatEval(P,W,H,d0){
   if(Math.hypot(F[0].x-zc[0],F[0].y-zc[1])-Math.hypot(F[F.length-1].x-zc[0],F[F.length-1].y-zc[1])<zw*0.3)return rej(15,P);
   const L=F[F.length-1],[u,v]=toUV(L.x/W,L.y/H);
   if(u<-0.6||u>1.6||v<-0.6||v>1.6)return rej(13,P);
-  return{x:L.x/W,y:L.y/H,W,H,d0,bounced:false,kmh:null,trail:P.map(p=>({x:p.x/W,y:p.y/H}))};
+  return{x:L.x/W,y:L.y/H,W,H,d0,bounced:false,kmh:null,tc:L.t,trail:P.map(p=>({x:p.x/W,y:p.y/H}))};
 }
 function evaluate(P,W,H,d0){
   const res=evaluateCore(P,W,H,d0);
-  if(res||!ballModel||!recede()||P.length<4)return res;
+  if(res||!ballModel||!recede()||P.length<6)return res;
   // 備援：登錄球色後，若一條軌跡明顯是一顆往前投出的球（持續變遠、平順、球速合理），
   // 卻沒有在好球帶附近留下通過點，代表球偏得很遠或被擋住 → 判壞球
   const t0=P[0].t,ts=P.map(p=>p.t-t0),inv=P.map(p=>1/p.d),fi=lin(ts,inv);
   if(fi.b<=0||Math.abs(fi.r)<0.9)return null;
-  const v=Math.abs(cfg.dist[view]*d0*fi.b)*3.6;if(v<15||v>200)return null;
+  const v=Math.abs(cfg.dist[view]*d0*fi.b)*3.6;if(v<15||v>cfg.vmax)return null;
+  if(P[0].d/P[P.length-1].d<1.6)return null;
+  {const L=P[P.length-1],[uu,vv]=toUV(L.x/W,L.y/H);if(uu<-1.5||uu>2.5||vv<-1.3||vv>2.3)return null;}
   const fx=lin(ts,P.map(p=>p.x)),fy=quadFit(ts,P.map(p=>p.y)),tol=Math.max(2,P[0].d);
   if(fx.rms>tol||fy.rms>tol*1.2)return null;
   const L=P[P.length-1];
   if(isStrike({x:L.x/W,y:L.y/H,W,H,d0}))return null;
-  return{x:L.x/W,y:L.y/H,W,H,d0,bounced:false,kmh:Math.round(v),missed:true,trail:P.map(p=>({x:p.x/W,y:p.y/H}))};
+  return{x:L.x/W,y:L.y/H,W,H,d0,bounced:false,kmh:Math.round(v),missed:true,tc:L.t,trail:P.map(p=>({x:p.x/W,y:p.y/H}))};
 }
 function evaluateCore(P,W,H,d0){
   if(P.length<3)return rej(1,P);
@@ -618,12 +691,21 @@ function evaluateCore(P,W,H,d0){
   if(P_?fi.b<=0:fi.b>=0)return rej(3,P);
   // 球速合理性：小朋友到職棒大約 8～200 km/h，超出就不是球
   const vz0=Math.abs(cfg.dist[view]*d0*fi.b)*3.6;
-  if(F.length>=4&&(vz0<6||vz0>230))return rej(8,P);
+  if(F.length>=4&&(vz0<12||vz0>cfg.vmax*1.15))return rej(8,P);
   const dFirst=F[0].d,dLast=F[F.length-1].d;
   const disp=Math.hypot(F[F.length-1].x-F[0].x,F[F.length-1].y-F[0].y);
   const sizeChange=Math.abs(dFirst-dLast)/Math.min(dFirst,dLast);
   if(disp<1.5*d0&&sizeChange<0.3)return rej(4,P);
+  // 停在原地只是慢慢變小的東西（例如剛被背景吸收的物體）不是飛行中的球：真正的球在畫面上一定會移動
+  if(disp<Math.max(2*d0,0.8*dFirst))return rej(22,P);
   if(F.length>=4&&Math.abs(fi.r)<0.5)return rej(5,P);
+  // 真正的投球：球的大小要穩定地朝一個方向變化，而且變化幅度夠大（從近到遠或從遠到近）
+  const minF=ballModel?4:5;
+  if(F.length<minF)return rej(18,P);
+  let bad=0;for(let i=1;i<F.length;i++){if(P_?F[i].d>F[i-1].d*1.06:F[i].d<F[i-1].d/1.06)bad++;}
+  if(bad>1)return rej(19,P);
+  const depthRatio=P_?F[0].d/F[F.length-1].d:F[F.length-1].d/F[0].d;
+  if(depthRatio<(ballModel?1.35:1.6))return rej(20,P);
   // 必須真的飛到好球帶附近
   const dEnd=P_?Math.min(...F.map(p=>p.d)):Math.max(...F.map(p=>p.d));
   // 球還沒飛到好球帶平面就離開畫面或被擋住（常見於大暴投、偏很多的壞球）：
@@ -661,13 +743,15 @@ function evaluateCore(P,W,H,d0){
     const mpp=(cfg.zoneW/100)/zoneEdges(W,H).w;
     const vl=Math.hypot(fx.b,fy.df(ts_))*mpp;
     const v=Math.hypot(vz,vl)*3.6;
-    if(v>=8&&v<=200)kmh=Math.round(v);else return rej(8,P);
+    if(v>=12&&v<=cfg.vmax)kmh=Math.round(v);else return rej(8,P);
   }
   // 沒登錄球的顏色時比較容易被雜物騙：要求軌跡夠長、而且算得出合理球速才算
   if(!ballModel&&P_&&!kmh)return rej(16,P);
+  // 通過點離好球帶太遠（超過 1.5 個框寬／高），不是朝這個好球帶投的球
+  {const[uu,vv]=toUV(x/W,y/H);if(uu<-1.5||uu>2.5||vv<-1.3||vv>2.3)return rej(21,P);}
   const out={x:x/W,y:y/H,W,H,d0};
   if(extrap&&!bounced&&isStrike(out))return rej(17,P);
-  return{x:x/W,y:y/H,W,H,d0,bounced,kmh,trail:P.map(p=>({x:p.x/W,y:p.y/H}))};
+  return{x:x/W,y:y/H,W,H,d0,bounced,kmh,tc:t0+ts_,trail:P.map(p=>({x:p.x/W,y:p.y/H}))};
 }
 
 /* ---------- judging ---------- */
@@ -699,28 +783,77 @@ function callPitch(res){
   lastTrail={pts:res.trail,hit:{x:res.x,y:res.y,r:(res.d0/2)/res.W},strike,t:performance.now()};
   clipCalls++;
   const mg=marginCm(res),mtxt=res.missed||res.bounced?'':strike?(mg>-2?' 擦邊':''):' 差 '+Math.max(0.1,mg).toFixed(1)+' 公分';
+  // 球到本壘前 0.6 秒到之後 0.3 秒內，球棒掃過好球帶前方 → 揮棒（不論好壞球都算好球）
+  const tc=res.tc;
+  if(batModel&&tc!=null&&det.swings.some(x=>x>=tc-0.6&&x<=tc+0.3)){
+    record(true,{u,v},'揮棒落空・'+where(res),src&&src.kind==='demo',res.kmh,'swing',true);return;
+  }
   record(strike,{u,v},(res.bounced?'觸地・':res.missed?'大暴投・':'')+where(res)+mtxt,src&&src.kind==='demo',res.kmh);
 }
-function record(strike,loc,desc,demo,kmh){
+// ---------- 比賽規則：好壞球 → 三振／保送 → 出局／上壘 → 換場 → 比賽結束 ----------
+function addRun(n){G.score[G.half]+=n;G.line[G.half][G.inning-1]=(G.line[G.half][G.inning-1]||0)+n;}
+function halfOver(){const r=GR();return r.mode==='outs'?G.outs>=3:r.mode==='pa'?G.pa>=r.paN:(G.outs>=3||G.pa>=r.paN);}
+function endPA(){
+  G.balls=0;G.strikes=0;G.pa++;
+  if(!halfOver())return'';
+  const r=GR();G.line[G.half][G.inning-1]=G.line[G.half][G.inning-1]||0;
+  const msg=r.mode==='pa'&&G.outs<3?'打完 '+r.paN+' 人次，換場':'三出局，換場';
+  G.outs=0;G.pa=0;G.bases=[0,0,0];
+  // 最後一局上半結束時主隊已領先，就不用打下半局
+  if(G.half===0&&G.inning>=r.innings&&G.score[1]>G.score[0]){G.over=true;return'比賽結束';}
+  if(G.half===0){G.half=1;}else{G.half=0;G.inning++;}
+  if(G.inning>r.innings){G.over=true;return'比賽結束';}
+  return msg;
+}
+function walk(){
+  const b=G.bases;
+  if(!b[0])b[0]=1;else if(!b[1])b[1]=1;else if(!b[2])b[2]=1;else addRun(1);
+}
+function outPA(){G.outs++;return endPA();}
+function hit(n){
+  let runs=0;const b=G.bases,nb=[0,0,0];
+  for(let i=2;i>=0;i--)if(b[i]){const to=i+n;if(to>=3)runs++;else nb[to]=1;}
+  if(n>=4)runs++;else nb[n-1]=1;
+  G.bases=nb;addRun(runs);G.h++;
+  return endPA()||(runs?'得 '+runs+' 分':'');
+}
+function gameOverMsg(){return'比賽結束　客 '+G.score[0]+' : '+G.score[1]+' 主';}
+// 偵測或手動判定一球：strike=true/false；kind 可為 'foul'（兩好球後不再加）
+function record(strike,loc,desc,demo,kmh,kind,auto){
+  if(G.over){note('比賽已結束，按「新比賽」重新開始。');return;}
   snap();
-  G.pitches.push({strike,loc,desc,demo:!!demo,kmh:kmh||null});
+  G.pitches.push({strike,loc,desc,demo:!!demo,kmh:kmh||null,kind:kind||null,auto:!!auto,at:Date.now()});
   window.__kz.calls=(window.__kz.calls||0)+1;window.__kz.last={strike,loc,desc,kmh};
-  let big='';
+  const r=GR();let big='';
   if(strike){
-    if(G.strikes<2)G.strikes++;
-    else{G.k++;G.outs++;G.balls=0;G.strikes=0;big='三振出局';}
+    if(kind==='foul'&&G.strikes>=r.strikes-1){}
+    else if(G.strikes<r.strikes-1)G.strikes++;
+    else{G.k++;big='三振出局';const m=outPA();if(m)big+='，'+m;}
   }else{
-    if(G.balls<3)G.balls++;
-    else{G.bb++;G.balls=0;G.strikes=0;big='四壞球保送';}
+    if(G.balls<r.balls-1)G.balls++;
+    else{G.bb++;walk();big=r.balls+' 壞球保送';const m=endPA();if(m)big+='，'+m;}
   }
-  if(G.outs>=3){G.outs=0;big=big?big+'，三出局換場':'三出局';}
+  if(G.over)big=gameOverMsg();
   render();
   flash(strike,big,kmh);
 }
-function flash(strike,big,kmh){
+function event(kind){
+  if(G.over){note('比賽已結束，按「新比賽」重新開始。');return;}
+  // 程式剛自動判「揮棒落空」，但其實有打到球：先取消那一球，再記錄打擊結果
+  const lp=G.pitches[G.pitches.length-1];
+  if(kind!=='swing'&&lp&&lp.kind==='swing'&&lp.auto&&Date.now()-lp.at<15000&&hist.length){G=JSON.parse(hist.pop());}
+  if(kind==='swing'){record(true,null,'揮棒落空',false,null,'swing');return;}
+  if(kind==='foul'){record(true,null,'界外球',false,null,'foul');return;}
+  snap();let big='';
+  if(kind==='out'){big='擊出出局';const m=outPA();if(m)big+='，'+m;}
+  else{const n={b1:1,b2:2,b3:3,hr:4}[kind];big=['','一壘安打','二壘安打','三壘安打','全壘打'][n];const m=hit(n);if(m)big+='，'+m;}
+  if(G.over)big=gameOverMsg();
+  render();flash(kind==='out',big,null,true);
+}
+function flash(strike,big,kmh,neutral){
   const c=$('#call');
   c.className='call '+(big?'big':strike?'strike':'ball');
-  c.innerHTML=(big||(strike?'好球':'壞球'))+'<small>'+(strike?'STRIKE':'BALL')+(kmh?' · '+kmh+' KM/H':'')+'</small>';
+  c.innerHTML=(big||(strike?'好球':'壞球'))+'<small>'+(neutral?'':(strike?'STRIKE':'BALL'))+(kmh?' · '+kmh+' KM/H':'')+'</small>';
   void c.offsetWidth;c.classList.add('show');
   clearTimeout(flash.t);flash.t=setTimeout(()=>{c.textContent='';},2600);
   if(voice&&'speechSynthesis' in window){
@@ -729,9 +862,17 @@ function flash(strike,big,kmh){
 }
 
 /* ---------- render UI ---------- */
-function dots(id,n){[...document.querySelectorAll(id+' span')].forEach((s,i)=>s.classList.toggle('on',i<n));}
+function dots(id,n,total){const el=$(id);if(el.children.length!==total){el.innerHTML='<span></span>'.repeat(total);}[...el.children].forEach((s,i)=>s.classList.toggle('on',i<n));}
 function render(){
-  dots('#dB',G.balls);dots('#dS',G.strikes);dots('#dO',G.outs);
+  const R_=GR();
+  dots('#dB',G.balls,R_.balls-1);dots('#dS',G.strikes,R_.strikes-1);dots('#dO',G.outs,2);
+  $('#score').textContent=G.score[0]+' : '+G.score[1];
+  $('#inn').textContent=G.over?'終':G.inning+(G.half?' ▼':' ▲');
+  let th='<tr><th></th>';for(let i=1;i<=R_.innings;i++)th+='<th>'+i+'</th>';th+='<th>R</th></tr>';
+  ['客','主'].forEach((t,h)=>{th+='<tr><th>'+t+'</th>';for(let i=1;i<=R_.innings;i++){const v=G.line[h][i-1];const now=!G.over&&G.inning===i&&G.half===h;th+='<td'+(now?' class="now"':'')+'>'+(v==null?(now?'0':''):v)+'</td>';}th+='<td class="tot">'+G.score[h]+'</td></tr>';});
+  $('#line').innerHTML=th;
+  const bs=G.bases.map((b,i)=>b?['一','二','三'][i]:null).filter(Boolean);
+  $('#gState').textContent=G.over?gameOverMsg():(G.half?'下半局 主隊進攻':'上半局 客隊進攻')+'　'+G.outs+' 出局'+(R_.mode!=='outs'?'，本半局第 '+(G.pa+1)+' 位打者（共 '+R_.paN+' 人次）':'')+'　壘上：'+(bs.length?bs.join('、')+'壘有人':'無人')+'　安打 '+G.h;
   const n=G.pitches.length,s=G.pitches.filter(p=>p.strike).length;
   $('#pcount').textContent=n;$('#stTotal').textContent=n;
   $('#stPct').textContent=n?Math.round(s/n*100)+'%':'–';
@@ -976,7 +1117,8 @@ function demoPitch(){
   const Zend=P?Z0+0.55:Z0;
   const T=Math.abs(Zend-Zr)/v;
   const bounce=Math.random()<0.15;
-  window.__kz.demo={kmh:Math.round(kmh),tu,tv,bounce};
+  const swing=Math.random()<0.5;
+  window.__kz.demo={kmh:Math.round(kmh),tu,tv,bounce,swing};
   const posAt=t=>{
     const s=Math.min(1,t/T),Z=Zr+(Zend-Zr)*s;
     let X=Xr+(Xt-Xr)*s*(Zend-Zr)/(Z0-Zr),Y=Yr+(Yt-Yr)*s*(Zend-Zr)/(Z0-Zr)+0.5*9.8*t*(T-t)*0.25;
@@ -996,7 +1138,7 @@ function demoPitch(){
       st.mitt={x:mp[0]+Math.sin(f*0.9)*2,y:mp[1],r:Fp*0.13/(Z0+0.55)};
       if(!SIDE)st.pitcher={x:DW*0.62+(t<0.05?Math.sin(f*0.6)*25:-30)};
       // 打者站在好球帶旁邊，球快到時揮棒（球棒會掃過好球帶前方）
-      const bz=proj(-0.75,0.05,Z0+0.1),sw=Math.min(1,Math.max(0,(t-T+0.18)/0.22));
+      const bz=proj(-0.75,0.05,Z0+0.1),sw=swing?Math.min(1,Math.max(0,(t-T+0.18)/0.22)):0;
       st.batter={x:bz[0]+Math.sin(f*0.21)*3,y:bz[1],rx:Fp*0.2/(Z0+0.1),ry:Fp*0.55/(Z0+0.1),hx:bz[0]+Fp*0.12/(Z0+0.1),hy:bz[1]-Fp*0.3/(Z0+0.1),ang:-2.3+sw*2.9,len:Fp*0.8/(Z0+0.1)};
     }else{
       st.person={x:DW*(0.1+0.8*((f*0.013)%1)),y:DH*0.33,rx:22,ry:48};
@@ -1026,15 +1168,24 @@ $('#btnDemo').addEventListener('click',demoPitch);
 
 /* ---------- ball registration ---------- */
 const pickCv=$('#pickCv'),pctx2=pickCv.getContext('2d',{willReadFrequently:true});
-let pickImg=null,pickPt=null;
+let pickImg=null,pickPt=null,pickFor='ball';
+let batModel=null;
+try{const m=JSON.parse(localStorage.getItem('kz-bat'));if(m&&Number.isFinite(m.cr))batModel=m;}catch(e){}
 function showBallState(){
   const sw=$('#swatch');
   if(ballModel){sw.style.background='rgb('+ballModel.rgb.join(',')+')';sw.classList.add('set');
     $('#ballState').textContent='已登錄：只會偵測這個顏色的球';$('#ballClear').hidden=false;}
   else{sw.style.background='transparent';sw.classList.remove('set');
     $('#ballState').textContent='尚未登錄：任何移動的小東西都可能被當成球';$('#ballClear').hidden=true;}
+  const bs=$('#batSwatch');
+  if(batModel){bs.style.background='rgb('+batModel.rgb.join(',')+')';bs.classList.add('set');$('#batState').textContent='已登錄：球到本壘前後，球棒掃過好球帶就判揮棒落空';$('#batClear').hidden=false;}
+  else{bs.style.background='transparent';bs.classList.remove('set');$('#batState').textContent='尚未登錄：揮棒要手動按「揮棒落空」';$('#batClear').hidden=true;}
 }
-function openPicker(source,w,h){
+function openPicker(source,w,h,what){
+  pickFor=what||'ball';
+  $('#pickTitle').textContent=pickFor==='bat'?'點一下球棒的中段':'點一下球的中心';
+  $('#pickTip').textContent=pickFor==='bat'?'用滑桿讓圓圈只圈住球棒的一段（不要圈到手和背景），顏色會用來偵測揮棒。':'再用滑桿讓黃色圓圈剛好框住球，只框球不要框到背景。';
+  $('#pickOk').textContent=pickFor==='bat'?'使用這支球棒':'使用這顆球';
   const sc=Math.min(1,900/Math.max(w,h));
   pickCv.width=Math.round(w*sc);pickCv.height=Math.round(h*sc);
   pctx2.drawImage(source,0,0,pickCv.width,pickCv.height);
@@ -1082,6 +1233,12 @@ function buildModel(img,c){
 $('#pickOk').addEventListener('click',()=>{
   const m=buildModel(pickImg,pickPt);
   if(!m){note('圓圈裡的畫面太暗或太小，請放大圓圈或換一張亮一點的照片。');return;}
+  if(pickFor==='bat'){
+    batModel=m;try{localStorage.setItem('kz-bat',JSON.stringify(m));}catch(_){}
+    closePicker();showBallState();
+    if(ballModel&&Math.hypot(ballModel.cr-m.cr,ballModel.cg-m.cg)<Math.max(ballModel.tol,m.tol)*1.2)note('球棒和球的顏色太接近，程式可能分不清楚。建議改用橘色或其他鮮豔顏色的球。');else note('');
+    return;
+  }
   ballModel=m;try{localStorage.setItem('kz-ball',JSON.stringify(m));}catch(_){}
   closePicker();showBallState();note('');
   if(src&&src.kind==='demo')scene(null);
@@ -1090,14 +1247,27 @@ $('#ballClear').addEventListener('click',()=>{ballModel=null;try{localStorage.re
 $('#ballPhoto').addEventListener('change',async e=>{
   const f=e.target.files[0];e.target.value='';if(!f)return;
   const url=URL.createObjectURL(f),im=new Image();
-  im.onload=()=>{openPicker(im,im.naturalWidth,im.naturalHeight);URL.revokeObjectURL(url);};
+  im.onload=()=>{openPicker(im,im.naturalWidth,im.naturalHeight,'ball');URL.revokeObjectURL(url);};
   im.onerror=()=>{note('這張照片讀不到，請再拍一次。');URL.revokeObjectURL(url);};
   im.src=url;
+});
+$('#batClear').addEventListener('click',()=>{batModel=null;try{localStorage.removeItem('kz-bat');}catch(_){}showBallState();});
+$('#batPhoto').addEventListener('change',e=>{
+  const f=e.target.files[0];e.target.value='';if(!f)return;
+  const url=URL.createObjectURL(f),im=new Image();
+  im.onload=()=>{openPicker(im,im.naturalWidth,im.naturalHeight,'bat');URL.revokeObjectURL(url);};
+  im.onerror=()=>{note('這張照片讀不到，請再拍一次。');URL.revokeObjectURL(url);};
+  im.src=url;
+});
+$('#batFromFrame').addEventListener('click',()=>{
+  if(!src){note('先開啟相機，請打者拿著球棒站好，再從畫面點選球棒。');return;}
+  if(src.kind==='clip')video.pause();
+  openPicker(src.el,src.w,src.h,'bat');
 });
 $('#ballFromFrame').addEventListener('click',()=>{
   if(!src){note('先開啟相機或選一段影片，再從畫面點選球。');return;}
   if(src.kind==='clip')video.pause();
-  openPicker(src.el,src.w,src.h);
+  openPicker(src.el,src.w,src.h,'ball');
 });
 showBallState();
 
@@ -1153,6 +1323,24 @@ $('#zoneWin').addEventListener('change',e=>setZoneW(e.target.value));
 $('#distIn').addEventListener('change',e=>setDist(e.target.value));
 $('#btnDebug').addEventListener('click',()=>{cfg.debug=!cfg.debug;saveCfg();syncCfgUI();});
 syncCfgUI();
+
+/* ---------- game settings ---------- */
+function syncGameUI(){const g=GR();$('#gInn').value=g.innings;$('#gMode').value=g.mode;$('#gPA').value=g.paN;$('#gS').value=g.strikes;$('#gB').value=g.balls;$('#gVmax').value=cfg.vmax;$('#gPA').disabled=g.mode==='outs';}
+function setGame(k,v){cfg.game[k]=v;saveCfg();syncGameUI();render();}
+$('#gInn').addEventListener('change',e=>setGame('innings',+e.target.value));
+$('#gMode').addEventListener('change',e=>setGame('mode',e.target.value));
+$('#gPA').addEventListener('change',e=>setGame('paN',+e.target.value));
+$('#gS').addEventListener('change',e=>setGame('strikes',+e.target.value));
+$('#gB').addEventListener('change',e=>setGame('balls',+e.target.value));
+$('#gVmax').addEventListener('change',e=>{cfg.vmax=+e.target.value;saveCfg();});
+$('#eSwing').addEventListener('click',()=>event('swing'));
+$('#eFoul').addEventListener('click',()=>event('foul'));
+$('#eOut').addEventListener('click',()=>event('out'));
+$('#e1B').addEventListener('click',()=>event('b1'));
+$('#e2B').addEventListener('click',()=>event('b2'));
+$('#e3B').addEventListener('click',()=>event('b3'));
+$('#eHR').addEventListener('click',()=>event('hr'));
+syncGameUI();
 
 /* ---------- controls ---------- */
 function syncView(){
@@ -1234,6 +1422,9 @@ $('#mFlip').addEventListener('click',()=>{
   if(lastTrail)lastTrail.strike=!p.strike;
   record(!p.strike,p.loc,p.desc,p.demo,p.kmh);
 });
+function newPA(){if(G.over)return;snap();G.balls=0;G.strikes=0;render();flash(false,'下一位打者',null,true);}
+$('#mPA').addEventListener('click',newPA);
+$('#stagePA').addEventListener('click',newPA);
 $('#mNew').addEventListener('click',()=>{snap();G=fresh();lastTrail=null;render();$('#call').textContent='';});
 
 /* ---------- boot ---------- */
