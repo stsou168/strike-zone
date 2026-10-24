@@ -38,8 +38,8 @@ html,body{background:var(--bg);color:var(--fg)}
 body{font-family:var(--f-body);line-height:1.5;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:14px 32px}
 .wrap{max-width:720px;margin:0 auto;display:grid;gap:14px}
 header{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
-h1{margin:0;font-size:1.3rem;font-weight:900;letter-spacing:.06em;text-wrap:balance}
-h1 small{display:block;font-size:.72rem;font-weight:500;color:var(--muted);letter-spacing:.02em}
+.h1{margin:0;font-size:1.3rem;font-weight:900;letter-spacing:.06em;text-wrap:balance}
+.h1 small{display:block;font-size:.72rem;font-weight:500;color:var(--muted);letter-spacing:.02em}
 .status{font-size:.8rem;color:var(--muted);display:flex;align-items:center;gap:6px;padding:4px 10px;border:1px solid var(--line);border-radius:99px}
 .status i{width:8px;height:8px;border-radius:50%;background:var(--muted)}
 .status.live i{background:var(--out);box-shadow:0 0 0 3px color-mix(in srgb,var(--out) 30%,transparent)}
@@ -90,6 +90,8 @@ button.b{border-color:color-mix(in srgb,var(--ball) 60%,var(--line));color:var(-
 .sizes{display:grid;grid-template-columns:auto 52px 52px;gap:8px 8px;align-items:center;justify-content:start}
 .sizes span{font-size:.9rem;color:var(--muted);padding-right:6px}
 .sizes button{justify-content:center;font-size:1.2rem;padding:6px}
+.step{counter-increment:st;display:grid;grid-template-columns:1.6em minmax(0,1fr)}
+.step::before{content:counter(st) ".";color:var(--muted)}
 .tip{margin:0;font-size:.82rem;color:var(--muted);max-width:62ch}
 .stageEdit{position:absolute;right:10px;bottom:10px;min-height:38px;background:rgba(8,12,20,.82);border-color:rgba(255,255,255,.25);font-size:.85rem}
 [hidden]{display:none!important}
@@ -119,14 +121,14 @@ ol.log .r.s{color:var(--strike)} ol.log .r.b{color:var(--ball)}
 ol.log .w{color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .empty{color:var(--muted);font-size:.88rem}
 details summary{cursor:pointer;font-weight:700}
-details ol{margin:.5em 0 0;padding-left:1.3em;display:grid;gap:6px;font-size:.9rem;max-width:62ch}
-details p{font-size:.88rem;color:var(--muted);max-width:62ch;margin:.6em 0 0}
+details .steps{counter-reset:st;margin:.5em 0 0;padding-left:1.3em;display:grid;gap:6px;font-size:.9rem;max-width:62ch}
+details .para{font-size:.88rem;color:var(--muted);max-width:62ch;margin:.6em 0 0}
 @media (prefers-reduced-motion:reduce){.call.show{animation:none}}
 </style>
 
 <div class="wrap">
   <header>
-    <h1>好球帶判官<small>投進框裡就是好球，框外就是壞球</small></h1>
+    <div class="h1" role="heading" aria-level="1">好球帶判官<small>投進框裡就是好球，框外就是壞球</small></div>
     <div class="status" id="status"><i></i><span id="statusText">示範模式</span></div>
   </header>
 
@@ -194,7 +196,7 @@ details p{font-size:.88rem;color:var(--muted);max-width:62ch;margin:.6em 0 0}
       <span>寬度</span><button id="zW0" type="button" aria-label="變窄">−</button><button id="zW1" type="button" aria-label="加寬">＋</button>
       <span>高度</span><button id="zH0" type="button" aria-label="變矮">−</button><button id="zH1" type="button" aria-label="加高">＋</button>
     </div>
-    <p class="tip">按「調整好球帶」後，四個角可以各自拖到任何位置，斜角拍攝時也能貼齊實際的框。拖框的中間可以整個移動。</p>
+    <div class="tip">按「調整好球帶」後，四個角可以各自拖到任何位置，斜角拍攝時也能貼齊實際的框。拖框的中間可以整個移動。</div>
     <div class="label">其他</div>
     <div class="btns">
       <button id="btnVoice" type="button" class="on">語音喊判：開</button>
@@ -235,19 +237,19 @@ details p{font-size:.88rem;color:var(--muted);max-width:62ch;margin:.6em 0 0}
   <section class="panel">
     <details>
       <summary>怎麼架手機</summary>
-      <p style="color:var(--fg);margin-top:.6em"><b>捕手後方</b>（戶外、距離夠）</p>
-      <ol>
-        <li>在捕手位置放一張網子或軟墊當「本壘」，手機架在網子正後方約 1 公尺、腰的高度，鏡頭朝向投手。</li>
-        <li>請孩子先站在打擊位置，按「調整好球帶」，把框拖到膝蓋上緣到胸口、寬度約等於本壘板（43 公分）。按一下就鎖定。</li>
-        <li>投手距離約 10 至 14 公尺。球打到網子時，程式抓球最靠近鏡頭的位置判好壞。誤判就按「改判上一球」。</li>
-      </ol>
-      <p style="color:var(--fg)"><b>投手後方</b>（室內、距離有限）</p>
-      <ol>
-        <li>在牆上或網子上用膠帶貼出好球帶方框，大小依孩子身高，寬約 43 公分、高約膝蓋到胸口。</li>
-        <li>手機架在投手斜後方約 1 公尺、胸口高度，鏡頭對準膠帶框。架穩，不要手拿。投手的身體盡量不要擋住框。</li>
-        <li>按「投手後方」，再按「調整好球帶」，把畫面上的框對齊牆上的膠帶框。也可以用「放大」「縮小」快速調整。投球距離 4 到 8 公尺都可以。</li>
-      </ol>
-      <p>光線越亮越準，背景不要有人走動。如果一直漏判就把靈敏度調高；一直亂判就調低。球完全偏出框外很遠時可能不會被偵測，請用手動按鈕。</p>
+      <div class="para" style="color:var(--fg);margin-top:.6em"><b>捕手後方</b>（戶外、距離夠）</div>
+      <div class="steps">
+        <div class="step">在捕手位置放一張網子或軟墊當「本壘」，手機架在網子正後方約 1 公尺、腰的高度，鏡頭朝向投手。</div>
+        <div class="step">請孩子先站在打擊位置，按「調整好球帶」，把框拖到膝蓋上緣到胸口、寬度約等於本壘板（43 公分）。按一下就鎖定。</div>
+        <div class="step">投手距離約 10 至 14 公尺。球打到網子時，程式抓球最靠近鏡頭的位置判好壞。誤判就按「改判上一球」。</div>
+      </div>
+      <div class="para" style="color:var(--fg)"><b>投手後方</b>（室內、距離有限）</div>
+      <div class="steps">
+        <div class="step">在牆上或網子上用膠帶貼出好球帶方框，大小依孩子身高，寬約 43 公分、高約膝蓋到胸口。</div>
+        <div class="step">手機架在投手斜後方約 1 公尺、胸口高度，鏡頭對準膠帶框。架穩，不要手拿。投手的身體盡量不要擋住框。</div>
+        <div class="step">按「投手後方」，再按「調整好球帶」，把畫面上的框對齊牆上的膠帶框。也可以用「放大」「縮小」快速調整。投球距離 4 到 8 公尺都可以。</div>
+      </div>
+      <div class="para">光線越亮越準，背景不要有人走動。如果一直漏判就把靈敏度調高；一直亂判就調低。球完全偏出框外很遠時可能不會被偵測，請用手動按鈕。</div>
     </details>
   </section>
 </div>
