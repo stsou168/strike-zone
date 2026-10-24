@@ -1,0 +1,577 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="好球帶判官">
+<meta name="theme-color" content="#0c131d">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" type="image/png" href="icon-512.png">
+<link rel="manifest" href="manifest.webmanifest">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font-size:14px}img{max-width:100%}[hidden]{display:none!important}</style>
+</head>
+<body>
+<title>好球帶判官</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Teko:wght@500;600&family=Noto+Sans+TC:wght@400;500;700;900&display=swap">
+<style>
+/* Layout: one-column broadcast console. Camera stage on top with a TV-style count bug, controls under it, pitch chart last. */
+:root{
+  --bg:#0c131d;
+  --panel:#141e2c;
+  --line:#26354b;
+  --fg:#eef2f7;
+  --muted:#8b9bb2;
+  --chalk:#f6f3ea;
+  --ball:#3fd98a;
+  --strike:#ffb21e;
+  --out:#ff5148;
+  --clay:#c97a43;
+  --f-score:"Teko","Oswald",Impact,"Arial Narrow",sans-serif;
+  --f-body:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
+  color-scheme:dark;
+}
+html,body{background:var(--bg);color:var(--fg)}
+body{font-family:var(--f-body);line-height:1.5;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:14px 32px}
+.wrap{max-width:720px;margin:0 auto;display:grid;gap:14px}
+header{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+h1{margin:0;font-size:1.3rem;font-weight:900;letter-spacing:.06em;text-wrap:balance}
+h1 small{display:block;font-size:.72rem;font-weight:500;color:var(--muted);letter-spacing:.02em}
+.status{font-size:.8rem;color:var(--muted);display:flex;align-items:center;gap:6px;padding:4px 10px;border:1px solid var(--line);border-radius:99px}
+.status i{width:8px;height:8px;border-radius:50%;background:var(--muted)}
+.status.live i{background:var(--out);box-shadow:0 0 0 3px color-mix(in srgb,var(--out) 30%,transparent)}
+.status.demo i{background:var(--strike)}
+
+.stage{position:relative;margin:0 auto;background:#000;border-radius:8px;overflow:hidden;touch-action:none;max-width:100%}
+.stage video,.stage canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+.stage video{object-fit:fill}
+.bug{position:absolute;top:10px;left:10px;display:flex;align-items:stretch;background:rgba(8,12,20,.86);border:1px solid rgba(255,255,255,.14);border-radius:4px;font-family:var(--f-score);line-height:1;pointer-events:none}
+.bug .cnt{display:grid;gap:3px;padding:6px 9px}
+.bug .row{display:flex;align-items:center;gap:6px;font-size:1.05rem;color:#cfd8e4}
+.bug .row b{width:12px;font-weight:600}
+.dots{display:flex;gap:4px}
+.dots span{width:10px;height:10px;border-radius:50%;border:1.5px solid rgba(255,255,255,.45)}
+.dots.b span.on{background:var(--ball);border-color:var(--ball)}
+.dots.s span.on{background:var(--strike);border-color:var(--strike)}
+.dots.o span.on{background:var(--out);border-color:var(--out)}
+.bug .pc{display:grid;place-items:center;padding:6px 10px;border-left:1px solid rgba(255,255,255,.14);text-align:center}
+.bug .pc em{font-style:normal;font-size:.8rem;color:#9fb0c6;letter-spacing:.08em}
+.bug .pc strong{font-size:1.9rem;font-weight:600;color:#fff;font-variant-numeric:tabular-nums}
+.call{position:absolute;left:50%;bottom:12%;transform:translateX(-50%);font-weight:900;font-size:clamp(2rem,9vw,3.6rem);letter-spacing:.12em;white-space:nowrap;pointer-events:none;text-shadow:0 3px 14px rgba(0,0,0,.7)}
+.call small{display:block;text-align:center;font-family:var(--f-score);font-size:.45em;letter-spacing:.3em;font-weight:500}
+.call.strike{color:var(--strike)}
+.call.ball{color:var(--ball)}
+.call.big{color:var(--out)}
+.call.show{animation:pop .25s ease-out}
+@keyframes pop{from{transform:translateX(-50%) scale(1.5);opacity:0}to{transform:translateX(-50%) scale(1);opacity:1}}
+.hint{position:absolute;right:10px;top:10px;max-width:46%;font-size:.75rem;background:rgba(8,12,20,.8);padding:5px 8px;border-radius:4px;color:var(--chalk);pointer-events:none}
+.note{font-size:.85rem;color:var(--fg);background:color-mix(in srgb,var(--clay) 18%,var(--panel));border:1px solid color-mix(in srgb,var(--clay) 50%,var(--line));border-radius:6px;padding:9px 12px}
+
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px;display:grid;gap:10px}
+.label{font-size:.72rem;letter-spacing:.14em;color:var(--muted);text-transform:uppercase}
+.btns{display:flex;flex-wrap:wrap;gap:8px}
+button,.filebtn{font:inherit;font-size:.92rem;font-weight:500;color:var(--fg);background:#1d2a3d;border:1px solid var(--line);border-radius:6px;padding:9px 13px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;min-height:42px}
+button:hover,.filebtn:hover{border-color:var(--muted)}
+button:focus-visible,.filebtn:focus-within,input:focus-visible{outline:2px solid var(--strike);outline-offset:2px}
+button.primary{background:var(--chalk);color:#111;border-color:var(--chalk);font-weight:700}
+button.on{background:color-mix(in srgb,var(--strike) 22%,#1d2a3d);border-color:var(--strike)}
+button.s{border-color:color-mix(in srgb,var(--strike) 60%,var(--line));color:var(--strike)}
+button.b{border-color:color-mix(in srgb,var(--ball) 60%,var(--line));color:var(--ball)}
+.filebtn input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+.filebtn{position:relative}
+.sl{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:.9rem}
+.sl input{flex:1;min-width:140px;accent-color:var(--strike)}
+.sl output{font-family:var(--f-score);font-size:1.3rem;width:2.2em;text-align:right;font-variant-numeric:tabular-nums}
+
+.chartwrap{display:grid;grid-template-columns:minmax(0,190px) minmax(0,1fr);gap:14px;align-items:start}
+@media (max-width:460px){.chartwrap{grid-template-columns:minmax(0,1fr)}}
+#chart{width:100%;max-width:220px;aspect-ratio:5/6;height:auto;display:block;margin:0 auto}
+.stats{display:flex;gap:16px;flex-wrap:wrap}
+.stat{display:grid}
+.stat strong{font-family:var(--f-score);font-size:2rem;line-height:1;font-weight:600;font-variant-numeric:tabular-nums}
+.stat span{font-size:.75rem;color:var(--muted)}
+ol.log{list-style:none;margin:0;padding:0;display:grid;gap:4px;font-size:.88rem}
+ol.log li{display:flex;gap:8px;align-items:center;border-bottom:1px dashed var(--line);padding-bottom:4px;min-width:0}
+ol.log .n{font-family:var(--f-score);font-size:1.1rem;color:var(--muted);width:2.2em;font-variant-numeric:tabular-nums}
+ol.log .r{font-weight:700;width:3em}
+ol.log .r.s{color:var(--strike)} ol.log .r.b{color:var(--ball)}
+ol.log .w{color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.empty{color:var(--muted);font-size:.88rem}
+details summary{cursor:pointer;font-weight:700}
+details ol{margin:.5em 0 0;padding-left:1.3em;display:grid;gap:6px;font-size:.9rem;max-width:62ch}
+details p{font-size:.88rem;color:var(--muted);max-width:62ch;margin:.6em 0 0}
+@media (prefers-reduced-motion:reduce){.call.show{animation:none}}
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>好球帶判官<small>投進框裡就是好球，框外就是壞球</small></h1>
+    <div class="status" id="status"><i></i><span id="statusText">示範模式</span></div>
+  </header>
+
+  <div class="stage" id="stage">
+    <video id="video" playsinline muted hidden></video>
+    <canvas id="demo" width="540" height="720"></canvas>
+    <canvas id="overlay"></canvas>
+    <div class="bug" aria-live="polite">
+      <div class="cnt">
+        <div class="row"><b>B</b><div class="dots b" id="dB"><span></span><span></span><span></span></div></div>
+        <div class="row"><b>S</b><div class="dots s" id="dS"><span></span><span></span></div></div>
+        <div class="row"><b>O</b><div class="dots o" id="dO"><span></span><span></span></div></div>
+      </div>
+      <div class="pc"><em>球數</em><strong id="pcount">0</strong></div>
+    </div>
+    <div class="hint" id="hint" hidden>拖曳框框移動，拖四個角調整大小</div>
+    <div class="call" id="call"></div>
+  </div>
+
+  <div class="note" id="note" hidden></div>
+
+  <section class="panel">
+    <div class="label">畫面來源</div>
+    <div class="btns">
+      <button class="primary" id="btnCam" type="button">開啟相機即時判定</button>
+      <label class="filebtn">錄一球<input id="fileRec" type="file" accept="video/*" capture="environment"></label>
+      <label class="filebtn">選擇影片<input id="filePick" type="file" accept="video/*"></label>
+      <button id="btnDemo" type="button">示範一球</button>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="label">設定</div>
+    <div class="btns">
+      <button id="btnEdit" type="button">調整好球帶</button>
+      <button id="btnVoice" type="button" class="on">語音喊判：開</button>
+    </div>
+    <label class="sl" for="sens">偵測靈敏度
+      <input id="sens" type="range" min="0" max="100" value="60">
+      <output id="sensOut">60</output>
+    </label>
+  </section>
+
+  <section class="panel">
+    <div class="label">手動判定與更正</div>
+    <div class="btns">
+      <button class="s" id="mS" type="button">好球</button>
+      <button class="b" id="mB" type="button">壞球</button>
+      <button id="mFlip" type="button">改判上一球</button>
+      <button id="mUndo" type="button">復原</button>
+      <button id="mNew" type="button">全部重來</button>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="label">落點圖（從捕手後方看）</div>
+    <div class="chartwrap">
+      <canvas id="chart" width="440" height="528"></canvas>
+      <div style="display:grid;gap:12px;min-width:0">
+        <div class="stats">
+          <div class="stat"><strong id="stTotal">0</strong><span>總球數</span></div>
+          <div class="stat"><strong id="stPct">–</strong><span>好球率</span></div>
+          <div class="stat"><strong id="stK">0</strong><span>三振</span></div>
+          <div class="stat"><strong id="stBB">0</strong><span>保送</span></div>
+        </div>
+        <ol class="log" id="log"></ol>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <details>
+      <summary>怎麼架手機</summary>
+      <ol>
+        <li>在捕手位置放一張網子或軟墊當「本壘」，手機架在網子正後方約 1 公尺、腰的高度，鏡頭朝向投手。</li>
+        <li>請孩子先站在打擊位置，按「調整好球帶」，把框拖到膝蓋上緣到胸口、寬度約等於本壘板（43 公分）。按一下就鎖定。</li>
+        <li>投手距離約 10 至 14 公尺。球打到網子時，程式抓球最靠近鏡頭的位置判好壞。誤判就按「改判上一球」。</li>
+      </ol>
+      <p>光線越亮越準，背景不要有人走動。如果一直漏判就把靈敏度調高；一直亂判就調低。球完全偏出框外很遠時可能不會被偵測，請用手動按鈕。</p>
+    </details>
+  </section>
+</div>
+
+<script>
+(function(){
+const $=s=>document.querySelector(s);
+const stage=$('#stage'),video=$('#video'),demoCv=$('#demo'),ov=$('#overlay'),octx=ov.getContext('2d');
+const dctx=demoCv.getContext('2d');
+const proc=document.createElement('canvas');
+const pctx=proc.getContext('2d',{willReadFrequently:true});
+
+/* ---------- state ---------- */
+const DEFAULT_ZONE={x:.34,y:.40,w:.32,h:.34};
+let zone={...DEFAULT_ZONE};
+try{const z=JSON.parse(localStorage.getItem('kz-zone'));if(z&&z.w>0.03&&z.h>0.03)zone=z;}catch(e){}
+let sens=60,editing=false,voice=true;
+try{const v=localStorage.getItem('kz-sens');if(v!==null){sens=+v;$('#sens').value=sens;$('#sensOut').textContent=sens;}}catch(e){}
+let src=null,stream=null,loopId=0,demoTimer=null,lastTrail=null,clipCalls=0;
+let G=fresh();const hist=[];
+function fresh(){return{balls:0,strikes:0,outs:0,k:0,bb:0,pitches:[]};}
+function snap(){hist.push(JSON.stringify(G));if(hist.length>80)hist.shift();}
+
+/* ---------- source & sizing ---------- */
+function setSource(el,w,h,kind){
+  src={el,w,h,kind};
+  proc.width=192;proc.height=Math.max(64,Math.round(192*h/w));
+  resetDet();fit();
+  const st=$('#status');st.className='status '+(kind==='demo'?'demo':'live');
+  $('#statusText').textContent=kind==='demo'?'示範模式':kind==='camera'?'即時偵測中':'分析影片中';
+  demoCv.hidden=kind!=='demo';video.hidden=kind==='demo';
+}
+function fit(){
+  const a=src?src.w/src.h:3/4;
+  const maxW=stage.parentElement.clientWidth;
+  const maxH=Math.max(280,window.innerHeight*0.64);
+  const w=Math.min(maxW,maxH*a);
+  stage.style.width=w+'px';stage.style.height=(w/a)+'px';
+  const dpr=Math.min(window.devicePixelRatio||1,2);
+  ov.width=Math.round(w*dpr);ov.height=Math.round(w/a*dpr);
+}
+addEventListener('resize',fit);
+
+/* ---------- detector ---------- */
+const det={prev:null,track:[],miss:0,cool:-1};
+function resetDet(){det.prev=null;det.track=[];det.miss=0;det.cool=-1;}
+
+// Pure blob finder: frame difference inside an ROI around the zone, keep ball-sized blobs.
+function findBlobs(g,prev,W,H,z,s){
+  const N=W*H,thr=70-s*0.5;
+  const x0=Math.max(0,Math.floor((z.x-z.w*0.6)*W)),x1=Math.min(W-1,Math.ceil((z.x+z.w*1.6)*W));
+  const y0=Math.max(0,Math.floor((z.y-z.h*0.6)*H)),y1=Math.min(H-1,Math.ceil((z.y+z.h*1.6)*H));
+  const mask=new Uint8Array(N);let cnt=0;
+  for(let i=0;i<N;i++){if(Math.abs(g[i]-prev[i])>thr){mask[i]=1;cnt++;}}
+  if(cnt>N*0.25)return{shake:true,blobs:[]};
+  const minA=Math.max(4,N*(0.00045-s*0.000003)),maxA=N*0.05;
+  const blobs=[],stack=[];
+  for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){
+    const i0=y*W+x;if(mask[i0]!==1)continue;
+    mask[i0]=2;stack.push(i0);
+    let a=0,sx=0,sy=0,mnx=x,mxx=x,mny=y,mxy=y;
+    while(stack.length){
+      const i=stack.pop(),px=i%W,py=(i-px)/W;
+      a++;sx+=px;sy+=py;
+      if(px<mnx)mnx=px;if(px>mxx)mxx=px;if(py<mny)mny=py;if(py>mxy)mxy=py;
+      if(px>x0&&mask[i-1]===1){mask[i-1]=2;stack.push(i-1);}
+      if(px<x1&&mask[i+1]===1){mask[i+1]=2;stack.push(i+1);}
+      if(py>y0&&mask[i-W]===1){mask[i-W]=2;stack.push(i-W);}
+      if(py<y1&&mask[i+W]===1){mask[i+W]=2;stack.push(i+W);}
+    }
+    if(a<minA||a>maxA)continue;
+    const bw=mxx-mnx+1,bh=mxy-mny+1,ar=bw/bh;
+    if(a/(bw*bh)<0.15||ar<0.2||ar>5)continue;
+    blobs.push({x:sx/a/W,y:sy/a/H,a,rpx:Math.sqrt(a/Math.PI)*0.6});
+  }
+  return{shake:false,blobs,minA};
+}
+
+function analyze(t){
+  if(!src)return;
+  const W=proc.width,H=proc.height;
+  try{pctx.drawImage(src.el,0,0,W,H);}catch(e){return;}
+  const d=pctx.getImageData(0,0,W,H).data,N=W*H,g=new Uint8Array(N);
+  for(let i=0,j=0;i<N;i++,j+=4)g[i]=(d[j]*77+d[j+1]*150+d[j+2]*29)>>8;
+  const prev=det.prev;det.prev=g;
+  if(!prev||t<det.cool||editing)return;
+  const r=findBlobs(g,prev,W,H,zone,sens);
+  if(r.shake)return;
+  let pick=null;
+  if(r.blobs.length){
+    if(det.track.length){
+      const L=det.track[det.track.length-1];let best=1e9;
+      for(const b of r.blobs){const dd=Math.hypot(b.x-L.x,b.y-L.y);if(dd<best){best=dd;pick=b;}}
+      if(best>0.45)pick=null;
+    }else{pick=r.blobs.reduce((m,b)=>b.a>m.a?b:m);}
+  }
+  if(pick){det.track.push({...pick,W,H});det.miss=0;}
+  else if(det.track.length){
+    if(++det.miss>=3){
+      const tr=det.track;det.track=[];det.miss=0;
+      const maxA=Math.max(...tr.map(p=>p.a));
+      if(tr.length>=2||maxA>=r.minA*2){
+        const hit=tr.find(p=>p.a>=maxA*0.75);
+        det.cool=t+1500;
+        callPitch(hit,tr);
+      }
+    }
+  }
+}
+
+/* ---------- judging ---------- */
+function isStrike(p){
+  const rx=p.rpx/p.W,ry=p.rpx/p.H;
+  const cx=Math.max(zone.x,Math.min(p.x,zone.x+zone.w));
+  const cy=Math.max(zone.y,Math.min(p.y,zone.y+zone.h));
+  const dx=(p.x-cx)/rx,dy=(p.y-cy)/ry;
+  return dx*dx+dy*dy<=1;
+}
+function where(p){
+  const u=(p.x-zone.x)/zone.w,v=(p.y-zone.y)/zone.h;
+  const out=[];
+  if(v<0)out.push('偏高');else if(v>1)out.push('偏低');
+  if(u<0)out.push('偏左');else if(u>1)out.push('偏右');
+  if(out.length)return out.join('、');
+  const row=['高','中','低'][Math.min(2,Math.floor(v*3))],col=['左','中','右'][Math.min(2,Math.floor(u*3))];
+  return row===col&&row==='中'?'正中':row+'・'+col;
+}
+function callPitch(p,trail){
+  const strike=isStrike(p);
+  const u=(p.x-zone.x)/zone.w,v=(p.y-zone.y)/zone.h;
+  lastTrail={pts:trail.map(q=>({x:q.x,y:q.y})),hit:{x:p.x,y:p.y,rx:p.rpx/p.W,ry:p.rpx/p.H},strike,t:performance.now()};
+  clipCalls++;
+  record(strike,{u,v},where(p),src&&src.kind==='demo');
+}
+function record(strike,loc,desc,demo){
+  snap();
+  G.pitches.push({strike,loc,desc,demo:!!demo});
+  let big='';
+  if(strike){
+    if(G.strikes<2)G.strikes++;
+    else{G.k++;G.outs++;G.balls=0;G.strikes=0;big='三振出局';}
+  }else{
+    if(G.balls<3)G.balls++;
+    else{G.bb++;G.balls=0;G.strikes=0;big='四壞球保送';}
+  }
+  if(G.outs>=3){G.outs=0;big=big?big+'，三出局換場':'三出局';}
+  render();
+  flash(strike,big);
+}
+function flash(strike,big){
+  const c=$('#call');
+  c.className='call '+(big?'big':strike?'strike':'ball');
+  c.innerHTML=(big||(strike?'好球':'壞球'))+'<small>'+(strike?'STRIKE':'BALL')+'</small>';
+  void c.offsetWidth;c.classList.add('show');
+  clearTimeout(flash.t);flash.t=setTimeout(()=>{c.textContent='';},2600);
+  if(voice&&'speechSynthesis' in window){
+    try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(big||(strike?'好球':'壞球'));u.lang='zh-TW';u.rate=1.05;speechSynthesis.speak(u);}catch(e){}
+  }
+}
+
+/* ---------- render UI ---------- */
+function dots(id,n){[...document.querySelectorAll(id+' span')].forEach((s,i)=>s.classList.toggle('on',i<n));}
+function render(){
+  dots('#dB',G.balls);dots('#dS',G.strikes);dots('#dO',G.outs);
+  const n=G.pitches.length,s=G.pitches.filter(p=>p.strike).length;
+  $('#pcount').textContent=n;$('#stTotal').textContent=n;
+  $('#stPct').textContent=n?Math.round(s/n*100)+'%':'–';
+  $('#stK').textContent=G.k;$('#stBB').textContent=G.bb;
+  const log=$('#log');log.innerHTML='';
+  if(!n){log.innerHTML='<li class="empty">還沒有投球紀錄。按「示範一球」看看怎麼運作。</li>';}
+  G.pitches.slice(-8).reverse().forEach((p,i)=>{
+    const li=document.createElement('li');
+    li.innerHTML='<span class="n">#'+(n-i)+'</span><span class="r '+(p.strike?'s':'b')+'">'+(p.strike?'好球':'壞球')+'</span><span class="w"></span>';
+    li.querySelector('.w').textContent=(p.desc||'手動判定')+(p.demo?'（示範）':'');
+    log.appendChild(li);
+  });
+  drawChart();
+}
+function drawChart(){
+  const c=$('#chart'),x=c.getContext('2d'),W=c.width,H=c.height;
+  x.clearRect(0,0,W,H);
+  const zw=W*0.5,zh=H*0.5,zx=(W-zw)/2,zy=(H-zh)/2;
+  x.fillStyle='rgba(246,243,234,0.05)';x.fillRect(zx,zy,zw,zh);
+  x.strokeStyle='rgba(246,243,234,0.25)';x.lineWidth=2;
+  for(let i=1;i<3;i++){x.beginPath();x.moveTo(zx+zw*i/3,zy);x.lineTo(zx+zw*i/3,zy+zh);x.stroke();x.beginPath();x.moveTo(zx,zy+zh*i/3);x.lineTo(zx+zw,zy+zh*i/3);x.stroke();}
+  x.strokeStyle='#f6f3ea';x.lineWidth=4;x.strokeRect(zx,zy,zw,zh);
+  // home plate
+  x.fillStyle='rgba(246,243,234,0.6)';x.beginPath();
+  const py=H-26;x.moveTo(zx,py-14);x.lineTo(zx+zw,py-14);x.lineTo(zx+zw,py);x.lineTo(W/2,py+14);x.lineTo(zx,py);x.closePath();x.fill();
+  const ps=G.pitches;
+  ps.forEach((p,i)=>{
+    if(!p.loc)return;
+    const px=zx+p.loc.u*zw,pyy=zy+p.loc.v*zh;
+    const cx=Math.max(14,Math.min(W-14,px)),cy=Math.max(14,Math.min(H-50,pyy));
+    const last=i===ps.length-1;
+    x.globalAlpha=last?1:Math.max(.35,1-(ps.length-1-i)*0.06);
+    x.fillStyle=p.strike?'#ffb21e':'#3fd98a';
+    x.beginPath();x.arc(cx,cy,last?24:19,0,Math.PI*2);x.fill();
+    if(last){x.strokeStyle='#fff';x.lineWidth=3;x.stroke();}
+    x.fillStyle='#0c131d';x.font='600 26px Teko, Impact, sans-serif';x.textAlign='center';x.textBaseline='middle';
+    x.fillText(String(i+1),cx,cy+1);
+  });
+  x.globalAlpha=1;
+}
+
+/* ---------- overlay ---------- */
+function drawOverlay(){
+  const W=ov.width,H=ov.height,dpr=W/(parseFloat(stage.style.width)||W);
+  octx.clearRect(0,0,W,H);
+  const zx=zone.x*W,zy=zone.y*H,zw=zone.w*W,zh=zone.h*H;
+  octx.fillStyle='rgba(0,0,0,0.22)';
+  octx.fillRect(0,0,W,zy);octx.fillRect(0,zy+zh,W,H-zy-zh);octx.fillRect(0,zy,zx,zh);octx.fillRect(zx+zw,zy,W-zx-zw,zh);
+  octx.setLineDash([6*dpr,6*dpr]);octx.strokeStyle='rgba(246,243,234,0.45)';octx.lineWidth=1.2*dpr;
+  for(let i=1;i<3;i++){octx.beginPath();octx.moveTo(zx+zw*i/3,zy);octx.lineTo(zx+zw*i/3,zy+zh);octx.stroke();octx.beginPath();octx.moveTo(zx,zy+zh*i/3);octx.lineTo(zx+zw,zy+zh*i/3);octx.stroke();}
+  octx.setLineDash([]);
+  octx.strokeStyle=editing?'#ffb21e':'#f6f3ea';octx.lineWidth=3*dpr;octx.strokeRect(zx,zy,zw,zh);
+  if(editing){
+    octx.fillStyle='#ffb21e';
+    for(const [hx,hy] of [[zx,zy],[zx+zw,zy],[zx,zy+zh],[zx+zw,zy+zh]]){octx.beginPath();octx.arc(hx,hy,9*dpr,0,Math.PI*2);octx.fill();}
+  }
+  if(lastTrail){
+    const age=performance.now()-lastTrail.t;
+    if(age<2800){
+      const al=age<2000?1:1-(age-2000)/800,col=lastTrail.strike?'255,178,30':'63,217,138';
+      octx.strokeStyle='rgba('+col+','+(0.6*al)+')';octx.lineWidth=2*dpr;octx.beginPath();
+      lastTrail.pts.forEach((p,i)=>i?octx.lineTo(p.x*W,p.y*H):octx.moveTo(p.x*W,p.y*H));octx.stroke();
+      const h=lastTrail.hit,r=Math.max(10*dpr,h.rx*W);
+      octx.fillStyle='rgba('+col+','+(0.35*al)+')';octx.strokeStyle='rgba('+col+','+al+')';octx.lineWidth=3*dpr;
+      octx.beginPath();octx.arc(h.x*W,h.y*H,r,0,Math.PI*2);octx.fill();octx.stroke();
+    }
+  }
+  requestAnimationFrame(drawOverlay);
+}
+
+/* ---------- zone editing ---------- */
+let drag=null;
+function norm(e){const b=ov.getBoundingClientRect();return{x:(e.clientX-b.left)/b.width,y:(e.clientY-b.top)/b.height,bw:b.width,bh:b.height};}
+ov.addEventListener('pointerdown',e=>{
+  if(!editing)return;
+  const p=norm(e),tol=28;
+  const corners=[['tl',zone.x,zone.y],['tr',zone.x+zone.w,zone.y],['bl',zone.x,zone.y+zone.h],['br',zone.x+zone.w,zone.y+zone.h]];
+  for(const [k,cx,cy] of corners){if(Math.hypot((p.x-cx)*p.bw,(p.y-cy)*p.bh)<tol){drag={k,start:p,z:{...zone}};break;}}
+  if(!drag&&p.x>zone.x&&p.x<zone.x+zone.w&&p.y>zone.y&&p.y<zone.y+zone.h)drag={k:'move',start:p,z:{...zone}};
+  if(drag){ov.setPointerCapture(e.pointerId);e.preventDefault();}
+});
+ov.addEventListener('pointermove',e=>{
+  if(!drag)return;
+  const p=norm(e),dx=p.x-drag.start.x,dy=p.y-drag.start.y,z=drag.z,m=0.04;
+  let {x,y,w,h}=z;
+  if(drag.k==='move'){x=Math.min(1-w,Math.max(0,z.x+dx));y=Math.min(1-h,Math.max(0,z.y+dy));}
+  else{
+    let l=z.x,t=z.y,r=z.x+z.w,b=z.y+z.h;
+    if(drag.k[1]==='l')l=Math.min(r-m,Math.max(0,l+dx));else r=Math.max(l+m,Math.min(1,r+dx));
+    if(drag.k[0]==='t')t=Math.min(b-m,Math.max(0,t+dy));else b=Math.max(t+m,Math.min(1,b+dy));
+    x=l;y=t;w=r-l;h=b-t;
+  }
+  zone={x,y,w,h};
+});
+const endDrag=()=>{if(drag){drag=null;try{localStorage.setItem('kz-zone',JSON.stringify(zone));}catch(e){}}};
+ov.addEventListener('pointerup',endDrag);ov.addEventListener('pointercancel',endDrag);
+
+/* ---------- sources ---------- */
+function stopAll(){
+  loopId++;clearInterval(demoTimer);demoTimer=null;
+  if(stream){stream.getTracks().forEach(t=>t.stop());stream=null;}
+  video.pause();
+  if(video.src&&video.src.startsWith('blob:'))URL.revokeObjectURL(video.src);
+  video.removeAttribute('src');video.srcObject=null;
+}
+function note(msg){const n=$('#note');n.textContent=msg||'';n.hidden=!msg;}
+function videoLoop(useMedia){
+  const id=++loopId;
+  if('requestVideoFrameCallback' in video){
+    const cb=(now,meta)=>{if(id!==loopId)return;analyze(useMedia?meta.mediaTime*1000:now);video.requestVideoFrameCallback(cb);};
+    video.requestVideoFrameCallback(cb);
+  }else{
+    const f=()=>{if(id!==loopId)return;if(!video.paused)analyze(useMedia?video.currentTime*1000:performance.now());requestAnimationFrame(f);};
+    requestAnimationFrame(f);
+  }
+}
+function clearDemoPitches(){if(G.pitches.some(p=>p.demo)){G=fresh();hist.length=0;render();}}
+async function startCamera(){
+  stopAll();note('');
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){
+    note('這個環境不支援即時相機。請改用「錄一球」：錄下一次投球後，程式會自動分析並判定。');return;
+  }
+  try{
+    stream=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{ideal:'environment'},width:{ideal:1280},height:{ideal:720},frameRate:{ideal:60}}});
+    video.srcObject=stream;video.muted=true;
+    await video.play();
+    if(!video.videoWidth)await new Promise(r=>video.addEventListener('loadedmetadata',r,{once:true}));
+    clearDemoPitches();
+    setSource(video,video.videoWidth,video.videoHeight,'camera');
+    videoLoop(false);
+    try{if(navigator.wakeLock)await navigator.wakeLock.request('screen');}catch(e){}
+  }catch(e){
+    stream=null;
+    note('無法開啟即時相機（可能是瀏覽器沒給權限，或目前的檢視器不允許相機）。可以改用「錄一球」，或用完整版網頁檔在手機瀏覽器開啟。');
+    runDemoScene();
+  }
+}
+video.addEventListener('resize',()=>{if(src&&src.kind==='camera'&&video.videoWidth)setSource(video,video.videoWidth,video.videoHeight,'camera');});
+async function loadFile(f){
+  if(!f)return;
+  stopAll();note('');
+  video.src=URL.createObjectURL(f);video.muted=true;
+  await new Promise((res,rej)=>{video.onloadedmetadata=res;video.onerror=rej;}).catch(()=>{note('這個影片格式讀不到，請換一段影片。');});
+  if(!video.videoWidth)return;
+  clearDemoPitches();
+  setSource(video,video.videoWidth,video.videoHeight,'clip');
+  clipCalls=0;video.playbackRate=0.5;
+  video.onended=()=>{
+    $('#statusText').textContent='影片分析完成';
+    if(!clipCalls)note('這段影片沒有偵測到球。可以把靈敏度調高再選一次，或直接用手動按鈕判定。');
+  };
+  videoLoop(true);
+  try{await video.play();}catch(e){note('影片無法自動播放，請再選一次。');}
+}
+$('#fileRec').addEventListener('change',e=>{loadFile(e.target.files[0]);e.target.value='';});
+$('#filePick').addEventListener('change',e=>{loadFile(e.target.files[0]);e.target.value='';});
+$('#btnCam').addEventListener('click',startCamera);
+
+/* ---------- demo pitch (synthetic frames through the same detector) ---------- */
+const DW=540,DH=720;
+function scene(ball){
+  const c=dctx;
+  const sky=c.createLinearGradient(0,0,0,DH);sky.addColorStop(0,'#1d2b3a');sky.addColorStop(.42,'#2c4a3a');sky.addColorStop(1,'#203826');
+  c.fillStyle=sky;c.fillRect(0,0,DW,DH);
+  c.fillStyle='#8a5a37';c.beginPath();c.ellipse(DW/2,DH*0.36,70,14,0,0,Math.PI*2);c.fill();
+  c.fillStyle='#d9dde3';c.fillRect(DW/2-8,DH*0.27,16,28);c.beginPath();c.arc(DW/2,DH*0.255,8,0,Math.PI*2);c.fill();
+  c.fillRect(DW/2-7,DH*0.31,5,22);c.fillRect(DW/2+2,DH*0.31,5,22);
+  c.strokeStyle='rgba(220,225,230,0.10)';c.lineWidth=1;
+  for(let x=0;x<=DW;x+=24){c.beginPath();c.moveTo(x,0);c.lineTo(x,DH);c.stroke();}
+  for(let y=0;y<=DH;y+=24){c.beginPath();c.moveTo(0,y);c.lineTo(DW,y);c.stroke();}
+  if(ball){
+    c.fillStyle='#f4f1ea';c.beginPath();c.arc(ball.x,ball.y,ball.r,0,Math.PI*2);c.fill();
+    if(ball.r>6){c.strokeStyle='#d23b2f';c.lineWidth=Math.max(1,ball.r/9);c.beginPath();c.arc(ball.x-ball.r*0.9,ball.y,ball.r*0.7,-0.9,0.9);c.stroke();c.beginPath();c.arc(ball.x+ball.r*0.9,ball.y,ball.r*0.7,Math.PI-0.9,Math.PI+0.9);c.stroke();}
+  }
+}
+function runDemoScene(){if(!src||src.kind!=='demo'){setSource(demoCv,DW,DH,'demo');}scene(null);}
+function demoPitch(){
+  stopAll();note('');
+  setSource(demoCv,DW,DH,'demo');
+  const tu=-0.25+Math.random()*1.5,tv=-0.25+Math.random()*1.5;
+  const tx=(zone.x+zone.w*tu)*DW,ty=(zone.y+zone.h*tv)*DH;
+  const sx=DW/2+10,sy=DH*0.27,F=12;
+  const frames=[];
+  for(let i=0;i<6;i++)frames.push(null);
+  for(let i=1;i<=F;i++){const s=i/F,k=Math.pow(s,2.2);frames.push({x:sx+(tx-sx)*k,y:sy+(ty-sy)*k,r:2+20*Math.pow(s,3)});}
+  for(let i=1;i<=6;i++)frames.push({x:tx,y:ty+i*i*1.2,r:22});
+  for(let i=0;i<50;i++)frames.push(null);
+  let f=0;const id=++loopId;
+  demoTimer=setInterval(()=>{
+    if(id!==loopId||f>=frames.length){clearInterval(demoTimer);return;}
+    const b=frames[f];scene(b&&b.y<DH+30?b:null);analyze(f*33);f++;
+  },33);
+}
+$('#btnDemo').addEventListener('click',demoPitch);
+
+/* ---------- controls ---------- */
+$('#btnEdit').addEventListener('click',e=>{
+  editing=!editing;e.currentTarget.classList.toggle('on',editing);
+  e.currentTarget.textContent=editing?'完成，鎖定好球帶':'調整好球帶';
+  $('#hint').hidden=!editing;stage.style.cursor=editing?'move':'';
+  if(!editing){try{localStorage.setItem('kz-zone',JSON.stringify(zone));}catch(_){}}
+});
+$('#btnVoice').addEventListener('click',e=>{voice=!voice;e.currentTarget.classList.toggle('on',voice);e.currentTarget.textContent='語音喊判：'+(voice?'開':'關');});
+$('#sens').addEventListener('input',e=>{sens=+e.target.value;$('#sensOut').textContent=sens;try{localStorage.setItem('kz-sens',sens);}catch(_){}});
+$('#mS').addEventListener('click',()=>record(true,null,null,false));
+$('#mB').addEventListener('click',()=>record(false,null,null,false));
+$('#mUndo').addEventListener('click',()=>{if(!hist.length)return;G=JSON.parse(hist.pop());lastTrail=null;render();$('#call').textContent='';});
+$('#mFlip').addEventListener('click',()=>{
+  if(!hist.length||!G.pitches.length)return;
+  const p=G.pitches[G.pitches.length-1];G=JSON.parse(hist.pop());
+  if(lastTrail)lastTrail.strike=!p.strike;
+  record(!p.strike,p.loc,p.desc,p.demo);
+});
+$('#mNew').addEventListener('click',()=>{snap();G=fresh();lastTrail=null;render();$('#call').textContent='';});
+
+/* ---------- boot ---------- */
+render();runDemoScene();requestAnimationFrame(drawOverlay);
+setTimeout(demoPitch,700);
+window.__kz={findBlobs};
+})();
+</script>
+</body>
+</html>
