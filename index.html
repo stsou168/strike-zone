@@ -209,6 +209,7 @@ details .para{font-size:.88rem;color:var(--muted);max-width:62ch;margin:.6em 0 0
     <div class="form">
       <label for="pBall">球的種類<select id="pBall"><option value="pingpong">桌球 4.0 公分</option><option value="tennis">網球 6.7 公分</option><option value="soft">軟式棒球 7.0 公分</option><option value="hard">硬式棒球 7.3 公分</option></select></label>
       <label for="pZoneW">好球帶實際寬度（公分）<input id="pZoneW" type="number" inputmode="decimal" min="10" max="120" step="0.1"></label>
+      <label for="pPitch">投手到好球帶距離（公尺）<input id="pPitch" type="number" inputmode="decimal" min="2" max="25" step="0.1"></label>
       <label for="pDist">鏡頭到好球帶距離（公尺）<input id="pDist" type="number" inputmode="decimal" min="0.5" max="30" step="0.1"></label>
       <label for="pBatH">打者身高（公分，ABS 規則用）<input id="pBatH" type="number" inputmode="decimal" min="80" max="220" step="1" placeholder="例如 140"></label>
       <button id="pAbs" type="button">依 ABS 規則設定框的高度</button>
@@ -295,6 +296,10 @@ details .para{font-size:.88rem;color:var(--muted);max-width:62ch;margin:.6em 0 0
       <label for="zoneWin">好球帶實際寬度（公分）
         <input id="zoneWin" type="number" inputmode="decimal" min="10" max="120" step="0.1">
       </label>
+      <label for="pitchIn">投手到好球帶距離（公尺）
+        <input id="pitchIn" type="number" inputmode="decimal" min="2" max="25" step="0.1">
+      </label>
+      <label for="resSel">鏡頭畫質<select id="resSel"><option value="4k">4K（球更清楚，30 格/秒）</option><option value="hd">1080p（60 格/秒，球速較準）</option></select></label>
       <label for="distIn"><span id="distLabel">鏡頭到好球帶距離（公尺）</span>
         <input id="distIn" type="number" inputmode="decimal" min="0.5" max="30" step="0.1">
       </label>
@@ -394,6 +399,7 @@ const $=s=>document.querySelector(s);
 const stage=$('#stage'),video=$('#video'),demoCv=$('#demo'),ov=$('#overlay'),octx=ov.getContext('2d');
 const dctx=demoCv.getContext('2d');
 const proc=document.createElement('canvas');
+let procW=0,procH=0;
 const pctx=proc.getContext('2d',{willReadFrequently:true});
 
 /* ---------- state ---------- */
@@ -478,16 +484,27 @@ function setSource(el,w,h,kind){
 // 處理解析度：讓好球帶平面上的球至少約 7 像素寬（不超過鏡頭原生解析度）
 function sizeProc(w,h){
   const d0n=zoneEdges(1,h/w).w*ballD()/(cfg.zoneW/100);
-  const PW=Math.round(Math.min(w,Math.max(240,Math.min(960,(sens>=70?9:7)/Math.max(1e-4,d0n)))));
-  proc.width=PW;proc.height=Math.max(64,Math.round(PW*h/w));
-  diag(d0n*w);
+  // 只把偵測範圍裁切下來分析，所以可以用到鏡頭原生解析度（最高 3840）而不拖慢速度
+  const PW=Math.round(Math.min(w,Math.max(240,Math.min(1920,(sens>=70?10:8)/Math.max(1e-4,d0n)))));
+  procW=PW;procH=Math.max(64,Math.round(PW*h/w));
+  diag(d0n*w,w);
 }
-function diag(nativePx){
+function diag(nativePx,nativeW){
   const el=$('#diag');if(!el)return;
-  const px=Math.round(nativePx*10)/10;
-  el.textContent='球在好球帶上約 '+px+' 像素寬'+(px<3?'：太小，請把手機移近、放大好球帶，或改用較大的球':px<5?'：偏小，偵測會比較吃力':'：大小足夠');
-  el.className='tip'+(px<3?' warn':'');
-  const pd=$('#pDiag');if(pd){pd.textContent=el.textContent;pd.className=el.className;}
+  const px=Math.round(nativePx*10)/10,z0=cfg.dist[view];
+  let t='球在好球帶上約 '+px+' 像素寬'+(nativeW?'（鏡頭寬 '+nativeW+' 像素）':'');
+  if(px>=6)t+='：大小足夠。';
+  else{
+    const need=Math.max(0.6,z0*px/6),move=z0-need;
+    t+=(px<3?'：太小，偵測會很不穩。':'：偏小。')+(view!=='catcher'&&move>0.2?'建議把鏡頭往好球帶方向移近約 '+move.toFixed(1)+' 公尺（鏡頭到好球帶約 '+need.toFixed(1)+' 公尺）。':'')+(nativeW&&nativeW<3000&&cfg.res4k?'這台裝置沒有提供 4K 畫面。':'');
+  }
+  if(view!=='catcher'){
+    const back=z0-cfg.pitchDist;
+    if(back<0)t+='注意：鏡頭比投手更靠近好球帶，請確認兩個距離有沒有填反。';
+    else t+='目前設定：鏡頭在投手後方約 '+back.toFixed(1)+' 公尺。';
+  }
+  el.textContent=t;el.className='tip'+(px<3?' warn':'');
+  const pd=$('#pDiag');if(pd){pd.textContent=t;pd.className=el.className;}
 }
 function reconfig(){if(src)setSource(src.el,src.w,src.h,src.kind);}
 // 依畫面與鏡頭比例自動配置：手機直拿、iPad 橫放都會把整個鏡頭畫面完整放進來
@@ -522,7 +539,7 @@ addEventListener('orientationchange',()=>setTimeout(fit,300));
    - 球撞網後彈跳 → 判定後短暫冷卻
 ------------------------------------------------ */
 const BALLS={pingpong:{n:'桌球',d:0.040},tennis:{n:'網球',d:0.067},soft:{n:'軟式棒球',d:0.070},hard:{n:'硬式棒球',d:0.073}};
-let cfg={waitSec:5,players:'pbc',ball:'pingpong',zoneW:43.2,batH:0,vmax:120,swingAuto:true,batSide:'right',game:{innings:3,mode:'outs',paN:5,strikes:3,balls:4},dist:{pitcher:7,side:6,catcher:1.5},debug:false};
+let cfg={res4k:true,pitchDist:6,waitSec:5,players:'pbc',ball:'pingpong',zoneW:43.2,batH:0,vmax:120,swingAuto:true,batSide:'right',game:{innings:3,mode:'outs',paN:5,strikes:3,balls:4},dist:{pitcher:7,side:6,catcher:1.5},debug:false};
 try{const c=JSON.parse(localStorage.getItem('kz-cfg'));if(c&&BALLS[c.ball])cfg={...cfg,...c,dist:{...cfg.dist,...(c.dist||{})},game:{...cfg.game,...(c.game||{})}};}catch(e){}
 function saveCfg(){try{localStorage.setItem('kz-cfg',JSON.stringify(cfg));}catch(_){}}
 let armAt=0,armAnnounced=true;
@@ -534,6 +551,13 @@ function resetDet(){det.key='';det.bg=null;det.tracks=[];det.cool=-1;det.blobs=[
 function zoneEdges(W,H){
   const L=(a,b)=>Math.hypot((quad[b][0]-quad[a][0])*W,(quad[b][1]-quad[a][1])*H);
   return{w:(L(0,1)+L(3,2))/2,h:(L(0,3)+L(1,2))/2};
+}
+// 投手到本壘距離：球最靠近鏡頭的地方是出手點，球在畫面上不可能比那裡更大
+function relDist(){return view==='catcher'?cfg.dist.catcher+cfg.pitchDist:Math.max(0.5,cfg.dist[view]-cfg.pitchDist);}
+function maxSizeRatio(){
+  if(view==='catcher')return 2.5;
+  const z0=cfg.dist[view],zr=relDist();
+  return Math.min(8,Math.max(2,z0/zr*1.3));
 }
 function ballD(){return BALLS[cfg.ball].d;}
 function expectedD(W,H){return zoneEdges(W,H).w*ballD()/(cfg.zoneW/100);}
@@ -567,7 +591,7 @@ function segment(d,g,bg,R,W,H,s,m,d0,bm,relax){
   for(let i=0;i<n;i++){const a=mask[i]?0.01:0.06;bg[i]+=a*(g[i]-bg[i]);}
   // 只有畫面幾乎整片都變（手機被碰到）才重建背景；打者、捕手佔掉一大塊時照樣偵測
   if(cnt>n*0.65){for(let i=0;i<n;i++)bg[i]=g[i];return{reset:true,blobs:[]};}
-  const lo=Math.max(1.4,d0*((recede()?0.38:0.28)-s*0.001)),hi=Math.max(6,d0*6),minA=Math.max(3,Math.PI/4*lo*lo*0.8),maxA=Math.PI/4*hi*hi*3;
+  const lo=Math.max(1.4,d0*((recede()?0.38:0.28)-s*0.001)),hi=Math.max(6,d0*maxSizeRatio()),minA=Math.max(3,Math.PI/4*lo*lo*0.8),maxA=Math.PI/4*hi*hi*3;
   const blobs=[],stack=[],rw=R.w,rh=R.h;
   for(let y=0;y<rh;y++)for(let x=0;x<rw;x++){
     const i0=y*rw+x;if(mask[i0]!==1)continue;
@@ -623,10 +647,12 @@ function segment(d,g,bg,R,W,H,s,m,d0,bm,relax){
 
 function analyze(tms){
   if(!src)return;
-  const t=tms/1000,W=proc.width,H=proc.height;
-  try{pctx.drawImage(src.el,0,0,W,H);}catch(e){return;}
+  const t=tms/1000,W=procW,H=procH;if(!W)return;
   const R=roiRect(W,H),key=W+'x'+H+':'+R.x+','+R.y+','+R.w+','+R.h;
-  const d=pctx.getImageData(R.x,R.y,R.w,R.h).data,n=R.w*R.h,g=new Float32Array(n);
+  if(proc.width!==R.w||proc.height!==R.h){proc.width=R.w;proc.height=R.h;}
+  const sx=R.x/W*src.w,sy=R.y/H*src.h,sw=R.w/W*src.w,sh=R.h/H*src.h;
+  try{pctx.drawImage(src.el,sx,sy,sw,sh,0,0,R.w,R.h);}catch(e){return;}
+  const d=pctx.getImageData(0,0,R.w,R.h).data,n=R.w*R.h,g=new Float32Array(n);
   for(let i=0,j=0;i<n;i++,j+=4)g[i]=(d[j]*77+d[j+1]*150+d[j+2]*29)/256;
   if(det.key!==key||!det.bg){det.key=key;det.bg=g;det.tracks=[];return;}
   if(t<det.lastT)det.tracks=[];det.lastT=t;
@@ -1066,9 +1092,9 @@ function drawOverlay(){
     octx.strokeStyle='#39c6ff';octx.lineWidth=1.5*dpr;
     for(const b of det.blobs){octx.beginPath();octx.arc(b.x*W,b.y*H,Math.max(4*dpr,b.d*W/2+2*dpr),0,Math.PI*2);octx.stroke();}
     octx.strokeStyle='rgba(57,198,255,.5)';
-    for(const tr of det.tracks){if(tr.pts.length<2)continue;octx.beginPath();tr.pts.forEach((p,i)=>{const x=p.x/proc.width*W,y=p.y/proc.height*H;i?octx.lineTo(x,y):octx.moveTo(x,y);});octx.stroke();}
-    if(proc.width){const R=roiRect(proc.width,proc.height);octx.setLineDash([3*dpr,5*dpr]);octx.strokeStyle='rgba(57,198,255,.6)';octx.strokeRect(R.x/proc.width*W,R.y/proc.height*H,R.w/proc.width*W,R.h/proc.height*H);octx.setLineDash([]);}
-    const d0=proc.width?expectedD(proc.width,proc.height)/proc.width:0;
+    for(const tr of det.tracks){if(tr.pts.length<2)continue;octx.beginPath();tr.pts.forEach((p,i)=>{const x=p.x/procW*W,y=p.y/procH*H;i?octx.lineTo(x,y):octx.moveTo(x,y);});octx.stroke();}
+    if(procW){const R=roiRect(procW,procH);octx.setLineDash([3*dpr,5*dpr]);octx.strokeStyle='rgba(57,198,255,.6)';octx.strokeRect(R.x/procW*W,R.y/procH*H,R.w/procW*W,R.h/procH*H);octx.setLineDash([]);}
+    const d0=procW?expectedD(procW,procH)/procW:0;
     const c=quad.reduce((a,q)=>[a[0]+q[0]/4,a[1]+q[1]/4],[0,0]);
     octx.strokeStyle='#ff5148';octx.beginPath();octx.arc(c[0]*W,c[1]*H,Math.max(2,d0*W/2),0,Math.PI*2);octx.stroke();
   }
@@ -1152,7 +1178,7 @@ async function startCamera(){
     note('這個環境不支援即時相機。請改用「錄一球」：錄下一次投球後，程式會自動分析並判定。');return;
   }
   try{
-    stream=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{ideal:'environment'},width:{ideal:1920},height:{ideal:1080},frameRate:{ideal:60}}});
+    stream=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{ideal:'environment'},width:{ideal:cfg.res4k?3840:1920},height:{ideal:cfg.res4k?2160:1080},frameRate:{ideal:cfg.res4k?30:60}}});
     video.srcObject=stream;video.muted=true;
     await video.play();
     if(!video.videoWidth)await new Promise(r=>video.addEventListener('loadedmetadata',r,{once:true}));
@@ -1437,13 +1463,17 @@ $('#pAbs').addEventListener('click',applyABS);
 
 /* ---------- ball & distance settings ---------- */
 function syncCfgUI(){
-  $('#ballType').value=$('#pBall').value=cfg.ball;$('#zoneWin').value=$('#pZoneW').value=cfg.zoneW;$('#distIn').value=$('#pDist').value=cfg.dist[view];$('#pSens').value=sens;$('#batH').value=$('#pBatH').value=cfg.batH||'';absInfo();
+  $('#ballType').value=$('#pBall').value=cfg.ball;$('#zoneWin').value=$('#pZoneW').value=cfg.zoneW;$('#distIn').value=$('#pDist').value=cfg.dist[view];$('#pSens').value=sens;$('#pitchIn').value=$('#pPitch').value=cfg.pitchDist;$('#resSel').value=cfg.res4k?'4k':'hd';$('#batH').value=$('#pBatH').value=cfg.batH||'';absInfo();
   $('#distLabel').textContent=view==='catcher'?'鏡頭到好球帶（網子）距離（公尺）':'鏡頭到好球帶距離（公尺）';
   $('#btnDebug').classList.toggle('on',cfg.debug);
 }
 function setBall(v){if(BALLS[v]){cfg.ball=v;saveCfg();reconfig();syncCfgUI();}}
 function setZoneW(v){v=parseFloat(v);if(v>=10&&v<=120){cfg.zoneW=v;saveCfg();reconfig();}syncCfgUI();}
-function setDist(v){v=parseFloat(v);if(v>=0.5&&v<=30){cfg.dist[view]=v;saveCfg();}syncCfgUI();}
+function setPitch(v){v=parseFloat(v);if(v>=2&&v<=25){cfg.pitchDist=v;saveCfg();reconfig();if(src)sizeProc(src.w,src.h);}syncCfgUI();}
+$('#pitchIn').addEventListener('change',e=>setPitch(e.target.value));
+$('#pPitch').addEventListener('change',e=>setPitch(e.target.value));
+$('#resSel').addEventListener('change',e=>{cfg.res4k=e.target.value==='4k';saveCfg();if(stream){note('畫質已變更，正在重新開啟相機…');startCamera();}});
+function setDist(v){v=parseFloat(v);if(v>=0.5&&v<=30){cfg.dist[view]=v;saveCfg();if(src)sizeProc(src.w,src.h);}syncCfgUI();}
 $('#pBall').addEventListener('change',e=>setBall(e.target.value));
 $('#pZoneW').addEventListener('change',e=>setZoneW(e.target.value));
 $('#pDist').addEventListener('change',e=>setDist(e.target.value));
