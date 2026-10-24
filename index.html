@@ -455,7 +455,7 @@ const recede=()=>view!=='catcher';
 try{const v=localStorage.getItem('kz-sens');if(v!==null){sens=+v;$('#sens').value=sens;$('#sensOut').textContent=sens;}}catch(e){}
 let picking=false,src=null,stream=null,loopId=0,demoTimer=null,lastTrail=null,clipCalls=0;
 let G=fresh();const hist=[];
-function fresh(){return{balls:0,strikes:0,outs:0,k:0,bb:0,h:0,pa:0,inning:1,half:0,bases:[0,0,0],score:[0,0],line:[[],[]],over:false,pitches:[]};}
+function fresh(){return{balls:0,strikes:0,outs:0,k:0,bb:0,h:0,pa:0,inning:1,half:0,bases:[0,0,0],score:[0,0],line:[[],[]],over:false,pitches:[],paStart:0,prevPaStart:0,justEnded:false};}
 function GR(){return cfg.game;}
 function snap(){hist.push(JSON.stringify(G));if(hist.length>80)hist.shift();}
 
@@ -866,6 +866,8 @@ function callPitch(res){
 function addRun(n){G.score[G.half]+=n;G.line[G.half][G.inning-1]=(G.line[G.half][G.inning-1]||0)+n;}
 function halfOver(){const r=GR();return r.mode==='outs'?G.outs>=3:r.mode==='pa'?G.pa>=r.paN:(G.outs>=3||G.pa>=r.paN);}
 function endPA(){
+  // 打席結束：鏡頭畫面上的落點標記在準備時間結束後清除
+  G.prevPaStart=G.paStart||0;G.paStart=G.pitches.length;G.justEnded=true;
   G.balls=0;G.strikes=0;G.pa++;
   if(!halfOver())return'';
   const r=GR();G.line[G.half][G.inning-1]=G.line[G.half][G.inning-1]||0;
@@ -894,6 +896,7 @@ function gameOverMsg(){return'比賽結束　客 '+G.score[0]+' : '+G.score[1]+'
 function record(strike,loc,desc,demo,kmh,kind,auto){
   if(G.over){note('比賽已結束，按「新比賽」重新開始。');return;}
   snap();
+  G.justEnded=false;
   G.pitches.push({strike,loc,desc,demo:!!demo,kmh:kmh||null,kind:kind||null,auto:!!auto,at:Date.now()});
   window.__kz.calls=(window.__kz.calls||0)+1;window.__kz.last={strike,loc,desc,kmh};
   const r=GR();let big='';
@@ -1034,8 +1037,11 @@ function drawOverlay(){
   // 每一球的位置：好球＝黃色實心圓（大小等於球），揮棒＝黃色圓圈，壞球＝綠色小圈
   {
     const e=zoneEdges(W,H),rad=Math.max(5*dpr,e.w*(ballD()*100/cfg.zoneW)/2);
-    const ps=G.pitches.filter(p=>p.loc&&Number.isFinite(p.loc.u));const n0=Math.max(0,ps.length-20);
-    ps.slice(n0).forEach((p,i,arr)=>{
+    // 只顯示這位打者的球；打席剛結束時，在準備倒數期間仍保留，倒數完才清掉
+    const keep=G.justEnded&&performance.now()<armAt;
+    const from=keep?(G.prevPaStart||0):(G.justEnded?G.pitches.length:(G.paStart||0));
+    const ps=G.pitches.slice(from).filter(p=>p.loc&&Number.isFinite(p.loc.u));
+    ps.forEach((p,i,arr)=>{
       const[x,y]=fromUV(p.loc.u,p.loc.v),X=x*W,Y=y*H,last=i===arr.length-1;
       octx.globalAlpha=last?1:0.55;
       if(p.strike&&p.kind!=='swing'){octx.fillStyle='#ffd21e';octx.strokeStyle='#3a2a00';octx.lineWidth=1.5*dpr;octx.beginPath();octx.arc(X,Y,rad,0,Math.PI*2);octx.fill();octx.stroke();}
@@ -1590,7 +1596,7 @@ $('#mFlip').addEventListener('click',()=>{
   if(lastTrail)lastTrail.strike=!p.strike;
   record(!p.strike,p.loc,p.desc,p.demo,p.kmh);
 });
-function newPA(){if(G.over)return;snap();G.balls=0;G.strikes=0;render();flash(false,'下一位打者',null,true);arm();}
+function newPA(){if(G.over)return;snap();G.prevPaStart=G.paStart||0;G.paStart=G.pitches.length;G.justEnded=true;G.balls=0;G.strikes=0;render();flash(false,'下一位打者',null,true);arm();}
 $('#mPA').addEventListener('click',newPA);
 $('#stagePA').addEventListener('click',newPA);
 $('#mNew').addEventListener('click',()=>{snap();G=fresh();lastTrail=null;render();$('#call').textContent='';});
