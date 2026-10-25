@@ -93,11 +93,35 @@ button.b{border-color:color-mix(in srgb,var(--ball) 60%,var(--line));color:var(-
 .step{counter-increment:st;display:grid;grid-template-columns:1.6em minmax(0,1fr)}
 .step::before{content:counter(st) ".";color:var(--muted)}
 .tip{margin:0;font-size:.82rem;color:var(--muted);max-width:62ch}
-.stageFull{position:absolute;left:10px;bottom:10px;min-height:38px;background:rgba(8,12,20,.82);border-color:rgba(255,255,255,.25);font-size:.85rem}
-#stageWrap{display:grid;justify-items:center}
+.stageFullX{min-height:38px;background:rgba(8,12,20,.82);border-color:rgba(255,255,255,.25);font-size:.85rem}
+#stageWrap{display:flex;flex-direction:column;align-items:center;gap:8px;min-width:0}
+.ctl{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;max-width:100%}
+.ctl button{min-height:40px;font-size:.88rem;padding:6px 12px;background:rgba(20,30,44,.92)}
+#stagePause.on{background:color-mix(in srgb,var(--strike) 30%,#1d2a3d);border-color:var(--strike)}
+.paused{position:absolute;inset:0;display:grid;place-content:center;justify-items:center;gap:6px;background:rgba(0,0,0,.45);color:var(--chalk);pointer-events:none}
+.paused b{font-size:clamp(1.8rem,7vw,3rem)}
+.toast{position:absolute;left:50%;top:12px;transform:translateX(-50%);max-width:92%;background:rgba(8,12,20,.92);color:var(--chalk);border:1px solid rgba(255,255,255,.2);border-radius:6px;padding:8px 12px;font-size:.88rem;z-index:5;text-align:center}
+.rot{position:fixed;inset:0;z-index:60;background:rgba(5,8,14,.94);display:grid;place-content:center;justify-items:center;gap:14px;padding:24px;text-align:center;color:var(--chalk)}
+.rot .ph{width:56px;height:96px;border:4px solid var(--chalk);border-radius:12px;animation:rot 1.6s ease-in-out infinite}
+@keyframes rot{0%,20%{transform:rotate(0)}60%,100%{transform:rotate(-90deg)}}
+@media (prefers-reduced-motion:reduce){.rot .ph{animation:none;transform:rotate(-90deg)}}
+.savebar{display:flex;justify-content:flex-end;gap:8px;border-top:1px solid var(--line);padding-top:10px}
+.zpanel #zSave{position:sticky;bottom:0;box-shadow:0 -10px 14px var(--panel)}
 body.full{overflow:hidden}
-body.full #stageWrap{position:fixed;inset:0;z-index:25;background:#000;place-items:center;padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px)}
+body.full #stageWrap{position:fixed;inset:0;z-index:25;background:#000;justify-content:center;padding:calc(6px + env(safe-area-inset-top,0px)) env(safe-area-inset-right,0px) calc(8px + env(safe-area-inset-bottom,0px)) env(safe-area-inset-left,0px)}
+body.editing #ctl,body.editing .bug{display:none}
+.stage.small .bug{transform:scale(.72);transform-origin:top left}
+.stage.small .hint{display:none}
+.bug strong,.bug em{white-space:nowrap}
+/* 手機橫向：按鈕排在畫面右側，讓相機畫面盡量大 */
+@media (orientation:landscape) and (max-height:520px){
+  body.full #stageWrap{flex-direction:row;justify-content:center;padding-left:max(8px,env(safe-area-inset-left,0px));padding-right:max(8px,env(safe-area-inset-right,0px))}
+  body.full .ctl{flex-direction:column;flex-wrap:nowrap;align-self:center}
+  body.full .ctl button{min-width:96px}
+}
 body.full #stageWrap.pl{padding-left:calc(min(300px,46vw) + env(safe-area-inset-left,0px))}
+body.full #stageWrap.pb{padding-bottom:calc(52vh + env(safe-area-inset-bottom,0px))}
+.zpanel.bottom{top:auto;left:0;right:0;width:auto;height:52vh;border-right:0;border-top:1px solid var(--line);padding:12px max(12px,env(safe-area-inset-right,0px)) calc(12px + env(safe-area-inset-bottom,0px)) max(12px,env(safe-area-inset-left,0px))}
 body.full #stageWrap.pr{padding-right:calc(min(300px,46vw) + env(safe-area-inset-right,0px))}
 body.full .stage{border-radius:0}
 .zpanel{position:fixed;top:0;bottom:0;left:0;z-index:30;width:min(300px,46vw);overflow:auto;display:grid;align-content:start;gap:12px;background:var(--panel);border-right:1px solid var(--line);padding:calc(12px + env(safe-area-inset-top,0px)) 12px calc(16px + env(safe-area-inset-bottom,0px)) calc(12px + env(safe-area-inset-left,0px))}
@@ -107,8 +131,8 @@ body.full .stage{border-radius:0}
 .zpanel .form{grid-template-columns:minmax(0,1fr)}
 .zpanel .seg{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
 .zpanel .seg button{justify-items:center;text-align:center;padding:8px 4px;font-size:.85rem}
-.stagePA{position:absolute;left:50%;transform:translateX(-50%);bottom:10px;min-height:38px;background:rgba(8,12,20,.82);border-color:rgba(255,255,255,.25);font-size:.85rem;white-space:nowrap}
-.stageEdit{position:absolute;right:10px;bottom:10px;min-height:38px;background:rgba(8,12,20,.82);border-color:rgba(255,255,255,.25);font-size:.85rem}
+.stagePAX{min-height:38px;background:rgba(8,12,20,.82);border-color:rgba(255,255,255,.25);font-size:.85rem;white-space:nowrap}
+.stageEditX{min-height:38px;background:rgba(8,12,20,.82);border-color:rgba(255,255,255,.25);font-size:.85rem}
 [hidden]{display:none!important}
 .ballrow{display:flex;align-items:center;gap:10px;min-width:0}
 .swatch{flex:none;width:30px;height:30px;border-radius:50%;border:2px dashed var(--muted)}
@@ -180,9 +204,14 @@ details .para{font-size:.88rem;color:var(--muted);max-width:62ch;margin:.6em 0 0
     <div class="hint" id="hint" hidden>四個角可各自拖動，拖中間整個移動</div>
     <div class="call" id="call"></div>
     <div class="wait" id="wait" hidden><b id="waitN">5</b><span>投手準備中</span></div>
-    <button class="stageEdit" id="stageEdit" type="button">調整框</button>
-    <button class="stageFull" id="stageFull" type="button">全螢幕</button>
-    <button class="stagePA" id="stagePA" type="button">下一位打者</button>
+    <div class="paused" id="pausedOv" hidden><b>已暫停</b><span>按「繼續」再開始偵測</span></div>
+    <div class="toast" id="toast" hidden></div>
+  </div>
+  <div class="ctl" id="ctl">
+    <button id="stageFull" type="button">全螢幕</button>
+    <button id="stagePause" type="button">暫停</button>
+    <button id="stagePA" type="button">下一位打者</button>
+    <button id="stageEdit" type="button">調整框</button>
   </div>
   </div>
   <aside class="zpanel" id="zpanel" hidden aria-label="調整好球帶">
@@ -223,6 +252,12 @@ details .para{font-size:.88rem;color:var(--muted);max-width:62ch;margin:.6em 0 0
   </aside>
 
   <div class="note" id="note" hidden></div>
+  <div class="rot" id="rot" hidden>
+    <div class="ph" aria-hidden="true"></div>
+    <strong>請把手機轉成橫向</strong>
+    <span class="tip" style="color:var(--chalk)">橫向畫面比較寬，好球帶和打者都放得下。若轉了沒反應，請從控制中心關閉「螢幕方向鎖定」。</span>
+    <button id="rotSkip" type="button">維持直向使用</button>
+  </div>
   <div class="sheet" id="sheet" hidden>
     <div class="sheetin">
       <strong id="pickTitle">點一下球的中心</strong>
@@ -321,6 +356,7 @@ details .para{font-size:.88rem;color:var(--muted);max-width:62ch;margin:.6em 0 0
       <input id="sens" type="range" min="0" max="100" value="60">
       <output id="sensOut">60</output>
     </label>
+    <div class="savebar"><button class="primary" id="saveSettings" type="button">儲存設定</button></div>
   </section>
 
   <section class="panel">
@@ -335,6 +371,7 @@ details .para{font-size:.88rem;color:var(--muted);max-width:62ch;margin:.6em 0 0
       <label for="gVmax">球速上限（過濾雜訊）<select id="gVmax"><option value="80">80 km/h（幼童）</option><option value="120">120 km/h（國小）</option><option value="150">150 km/h（國高中）</option><option value="170">170 km/h（成人）</option></select></label>
     </div>
     <div class="linewrap"><table class="line" id="line"></table></div>
+    <div class="savebar"><button class="primary" id="saveGame" type="button">儲存比賽設定</button></div>
     <div class="tip" id="gState"></div>
     <div class="label">打者結果（程式看不到揮棒，請手動按）</div>
     <div class="btns">
@@ -401,7 +438,8 @@ const $=s=>document.querySelector(s);
 const stage=$('#stage'),video=$('#video'),demoCv=$('#demo'),ov=$('#overlay'),octx=ov.getContext('2d');
 const dctx=demoCv.getContext('2d');
 const proc=document.createElement('canvas');
-let procW=0,procH=0;
+let procW=0,procH=0,pixBudget=260000,lastAdapt=0;
+
 const pctx=proc.getContext('2d',{willReadFrequently:true});
 
 /* ---------- state ---------- */
@@ -487,7 +525,12 @@ function setSource(el,w,h,kind){
 function sizeProc(w,h){
   const d0n=zoneEdges(1,h/w).w*ballD()/(cfg.zoneW/100);
   // 只把偵測範圍裁切下來分析，所以可以用到鏡頭原生解析度（最高 3840）而不拖慢速度
-  const PW=Math.round(Math.min(w,Math.max(240,Math.min(1920,(sens>=70?10:8)/Math.max(1e-4,d0n)))));
+  // 每格只分析偵測範圍；像素數量有上限，避免手機跑不動（實測 4K 直式每格 95 毫秒，只剩每秒 10 格）
+  ensureRects();
+  const o=rects.outer,b=cfg.players==='pc'?o:rects.batter;
+  const fx=Math.max(o.x+o.w,b.x+b.w,zone.x+zone.w)-Math.min(o.x,b.x,zone.x),fy=Math.max(o.y+o.h,b.y+b.h,zone.y+zone.h)-Math.min(o.y,b.y,zone.y);
+  const pwBudget=Math.sqrt(pixBudget/Math.max(0.01,fx*fy*h/w));
+  const PW=Math.round(Math.min(w,Math.max(240,Math.min(1920,pwBudget,(sens>=70?10:8)/Math.max(1e-4,d0n)))));
   procW=PW;procH=Math.max(64,Math.round(PW*h/w));
   diag(d0n*w,w);
 }
@@ -517,18 +560,21 @@ function fit(){
     const cs=getComputedStyle(wrap);
     maxW=wrap.clientWidth-parseFloat(cs.paddingLeft)-parseFloat(cs.paddingRight);
     maxH=wrap.clientHeight-parseFloat(cs.paddingTop)-parseFloat(cs.paddingBottom);
-  }else{maxW=wrap.clientWidth;maxH=Math.max(280,window.innerHeight*(a>1.2?0.72:0.64));}
+    const side=cs.flexDirection==='row',cb=$('#ctl');
+    if(cb.offsetWidth||cb.offsetHeight){if(side)maxW-=cb.offsetWidth+12;else maxH-=cb.offsetHeight+8;}
+  }else{maxW=wrap.clientWidth;maxH=Math.max(260,window.innerHeight*(a>1.2?0.72:0.64)-$('#ctl').offsetHeight);}
+  checkRotate();
   const w=Math.min(maxW,maxH*a);
   // iPad 直放卻開著「螢幕方向鎖定」時，畫面和鏡頭方向會對不上
   if(src&&src.kind==='camera'&&document.body.classList.contains('full')){
     const scrL=innerWidth>innerHeight,camL=src.w>src.h;
     if(scrL!==camL&&!fit.warned){fit.warned=true;note('畫面方向和鏡頭方向不一致：如果平板是直放，請從控制中心關閉「螢幕方向鎖定」，畫面就會自動轉正。');}
   }
-  stage.style.width=w+'px';stage.style.height=(w/a)+'px';
+  stage.style.width=w+'px';stage.style.height=(w/a)+'px';stage.classList.toggle('small',w<430);
   const dpr=Math.min(window.devicePixelRatio||1,2);
   ov.width=Math.round(w*dpr);ov.height=Math.round(w/a*dpr);
 }
-addEventListener('resize',fit);
+addEventListener('resize',()=>{fit();if(typeof placePanel==='function'&&!$('#zpanel').hidden)placePanel();});
 addEventListener('orientationchange',()=>setTimeout(fit,300));
 
 /* ---------- detector ----------
@@ -541,11 +587,11 @@ addEventListener('orientationchange',()=>setTimeout(fit,300));
    - 球撞網後彈跳 → 判定後短暫冷卻
 ------------------------------------------------ */
 const BALLS={pingpong:{n:'桌球',d:0.040},tennis:{n:'網球',d:0.067},soft:{n:'軟式棒球',d:0.070},hard:{n:'硬式棒球',d:0.073}};
-let cfg={camId:'',zoom:1,res4k:true,pitchDist:6,waitSec:5,players:'pbc',ball:'pingpong',zoneW:43.2,batH:0,vmax:120,swingAuto:true,batSide:'right',game:{innings:3,mode:'outs',paN:5,strikes:3,balls:4},dist:{pitcher:7,side:6,catcher:1.5},debug:false};
-try{const c=JSON.parse(localStorage.getItem('kz-cfg'));if(c&&BALLS[c.ball])cfg={...cfg,...c,dist:{...cfg.dist,...(c.dist||{})},game:{...cfg.game,...(c.game||{})}};}catch(e){}
+let cfg={v:3,camId:'',zoom:1,res4k:true,pitchDist:6,waitSec:5,players:'pbc',ball:'pingpong',zoneW:43.2,batH:0,vmax:120,swingAuto:true,batSide:'right',game:{innings:3,mode:'outs',paN:5,strikes:3,balls:4},dist:{pitcher:7,side:6,catcher:1.5},debug:false};
+try{const c=JSON.parse(localStorage.getItem('kz-cfg'));if(c&&(c.v||0)<3){c.res4k=false;c.v=3;}if(c&&BALLS[c.ball])cfg={...cfg,...c,dist:{...cfg.dist,...(c.dist||{})},game:{...cfg.game,...(c.game||{})}};}catch(e){}
 function saveCfg(){try{localStorage.setItem('kz-cfg',JSON.stringify(cfg));}catch(_){}}
-let armAt=0,armAnnounced=true;
-function arm(){const w=+cfg.waitSec||0;armAt=performance.now()+w*1000;armAnnounced=w===0;det.tracks=[];}
+let armAt=0,armAnnounced=true,paused=false;
+function arm(){if(paused)return;const w=+cfg.waitSec||0;armAt=performance.now()+w*1000;armAnnounced=w===0;det.tracks=[];}
 const det={key:'',bg:null,tracks:[],cool:-1,blobs:[],lastT:0,swings:[],movBase:0.02,lastMov:0,swingFlash:0};
 function resetDet(){det.key='';det.bg=null;det.tracks=[];det.cool=-1;det.blobs=[];det.swings=[];}
 
@@ -627,7 +673,11 @@ function segment(d,g,bg,R,W,H,s,m,d0,bm,relax){
     }
     // 打者正在揮棒時，球旁邊本來就會有球棒在動，放寬一點（已登錄球色時才放寬）
     if(ringA>0&&ring/ringA>(relax&&m?0.65:0.3))continue;
-    if(!inRect(rects.outer,(R.x+cx)/W,(R.y+cy)/H))continue;
+    {const bx=(R.x+cx)/W,by=(R.y+cy)/H;
+     if(!inRect(rects.outer,bx,by))continue;
+     // 打者框裡（好球帶附近除外）：打者的衣服、手、球棒都在這裡
+     // 只排除「和打者差不多遠」的小東西（大小接近好球帶上的球）；剛出手、離鏡頭還近的球比較大，不受影響
+     if(cfg.players!=='pc'&&recede()&&dm<d0*1.7&&inRect(rects.batter,bx,by)&&!inRect({x:zone.x-zone.w*0.45,y:zone.y-zone.h*0.4,w:zone.w*1.9,h:zone.h*1.8},bx,by))continue;}
     blobs.push({x:R.x+cx,y:R.y+cy,d:dm,a});
   }
   // 揮棒偵測：好球帶前方（框左右各延伸半個框寬）有多少「正在移動、顏色像球棒」的像素
@@ -650,7 +700,12 @@ function segment(d,g,bg,R,W,H,s,m,d0,bm,relax){
 function analyze(tms){
   if(!src)return;
   const t0p=performance.now();
-  try{return analyzeCore(tms);}finally{const dt=performance.now()-t0p;det.procMs=det.procMs?det.procMs*0.9+dt*0.1:dt;det.frames=(det.frames||0)+1;}
+  try{return analyzeCore(tms);}finally{
+    const dt=performance.now()-t0p;det.procMs=det.procMs?det.procMs*0.9+dt*0.1:dt;det.frames=(det.frames||0)+1;
+    // 自動降載：平均每格超過 25 毫秒就降低分析解析度
+    const now=performance.now();
+    if(det.frames>60&&det.procMs>30&&now-lastAdapt>3000&&pixBudget>130000){lastAdapt=now;pixBudget*=0.7;det.procMs=0;det.frames=0;sizeProc(src.w,src.h);resetDet();}
+  }
 }
 function analyzeCore(tms){
   const t=tms/1000,W=procW,H=procH;if(!W)return;
@@ -663,7 +718,8 @@ function analyzeCore(tms){
   if(det.key!==key||!det.bg){det.key=key;det.bg=g;det.tracks=[];return;}
   if(t<det.lastT)det.tracks=[];det.lastT=t;
   const d0=expectedD(W,H);
-  const relax=det.swings.length&&t-det.swings[det.swings.length-1]<0.5||det.lastMov>det.movBase*3+0.06;
+  // 剛偵測到揮棒時，球旁邊本來就有球棒在動：好球帶附近放寬孤立檢查（打者框裡的東西另外排除）
+  const relax=det.swings.length&&t-det.swings[det.swings.length-1]<0.5;
   const r=segment(d,g,det.bg,R,W,H,sens,ballModel,d0,batModel,relax);
   if(!r.reset&&cfg.players!=='pc'){
     // 揮棒：球棒顏色像素夠多（有登錄球棒時），或打者框裡突然出現大量動作（比平常多很多）
@@ -675,7 +731,7 @@ function analyzeCore(tms){
   }
   det.blobs=r.blobs.map(b=>({x:b.x/W,y:b.y/H,d:b.d/W}));
   // 準備時間內只更新背景、不判定，讓投手撿球、站好
-  if(r.reset||editing||picking||(src.kind==='camera'&&performance.now()<armAt)){det.tracks=[];return;}
+  if(r.reset||editing||picking||paused||(src.kind==='camera'&&performance.now()<armAt)){det.tracks=[];return;}
   track(r.blobs,t,W,H,d0);
 }
 
@@ -1064,10 +1120,10 @@ function drawOverlay(){
   }
   {
     const left=armAt-performance.now(),wv=$('#wait');
-    const show=left>0&&src&&src.kind!=='demo'&&!editing;
+    const show=left>0&&src&&src.kind!=='demo'&&!editing&&!paused;
     if(wv.hidden===!!show)wv.hidden=!show;
     if(show){const n=Math.ceil(left/1000);if($('#waitN').textContent!==String(n))$('#waitN').textContent=n;}
-    if(!armAnnounced&&left<=0){armAnnounced=true;if(src&&src.kind!=='demo'){flash(false,'請投球',null,true);}}
+    if(!armAnnounced&&left<=0&&!paused){armAnnounced=true;if(src&&src.kind!=='demo'){flash(false,'請投球',null,true);}}
   }
   // 每一球的位置：好球＝黃色實心圓（大小等於球），揮棒＝黃色圓圈，壞球＝綠色小圈
   {
@@ -1160,7 +1216,7 @@ function convex(q){
     if(Math.abs(cr)<1e-6)return false;const sg=Math.sign(cr);if(!sign)sign=sg;else if(sg!==sign)return false;}
   return true;
 }
-const endDrag=()=>{if(drag){const wasRect=drag.rect;drag=null;if(wasRect){saveRects();resetDet();}else saveZone();}};
+const endDrag=()=>{if(drag){const wasRect=drag.rect;drag=null;if(wasRect){saveRects();if(src)sizeProc(src.w,src.h);resetDet();}else saveZone();}};
 ov.addEventListener('pointerup',endDrag);ov.addEventListener('pointercancel',endDrag);
 
 /* ---------- sources ---------- */
@@ -1171,7 +1227,12 @@ function stopAll(){
   if(video.src&&video.src.startsWith('blob:'))URL.revokeObjectURL(video.src);
   video.removeAttribute('src');video.srcObject=null;
 }
-function note(msg){const n=$('#note');n.textContent=msg||'';n.hidden=!msg;}
+function note(msg){const n=$('#note');n.textContent=msg||'';n.hidden=!msg;toast(msg);}
+function toast(msg,ms){
+  const t=$('#toast');if(!t)return;
+  if(!msg||!document.body.classList.contains('full')){t.hidden=true;return;}
+  t.textContent=msg;t.hidden=false;clearTimeout(toast.h);toast.h=setTimeout(()=>{t.hidden=true;},ms||6000);
+}
 function videoLoop(useMedia){
   const id=++loopId;
   if('requestVideoFrameCallback' in video){
@@ -1409,8 +1470,12 @@ $('#pickOk').addEventListener('click',()=>{
     if(ballModel&&Math.hypot(ballModel.cr-m.cr,ballModel.cg-m.cg)<Math.max(ballModel.tol,m.tol)*1.2)note('球棒和球的顏色太接近，程式可能分不清楚。建議改用橘色或其他鮮豔顏色的球。');else note('');
     return;
   }
+  // 檢查畫面上還有多少東西跟球同色（例如紅衣服），太多就提醒
+  let same=0,tot=0;{const d=pickImg.data,Wp=pickImg.width;for(let y=0;y<pickImg.height;y+=2)for(let x=0;x<Wp;x+=2){if((x-pickPt.x)**2+(y-pickPt.y)**2<(pickPt.r*1.6)**2)continue;tot++;if(matchColor(d,(y*Wp+x)*4,m,sens))same++;}}
+  const frac=tot?same/tot:0;
   ballModel=m;try{localStorage.setItem('kz-ball',JSON.stringify(m));}catch(_){}
-  closePicker();showBallState();note('');
+  closePicker();showBallState();
+  note(frac>0.004?'注意：畫面中有約 '+(frac*100).toFixed(1)+'% 的地方和球同色（例如衣服、裝飾品），容易誤判。請換掉同色的衣服或物品，或改用不同顏色的球。':'已登錄球的顏色。');
   if(src&&src.kind==='demo')scene(null);
 });
 $('#ballClear').addEventListener('click',()=>{ballModel=null;try{localStorage.removeItem('kz-ball');}catch(_){}showBallState();});
@@ -1541,6 +1606,16 @@ $('#zoomIn').addEventListener('change',e=>applyZoom(+e.target.value));
 $('#zoomIn').addEventListener('input',e=>{$('#zoomOut').textContent=(+e.target.value).toFixed(1)+'×';});
 $('#camSel').addEventListener('change',e=>{cfg.camId=e.target.value;saveCfg();if(stream){note('切換鏡頭中…換鏡頭後請重新對齊好球帶。');startCamera();}});
 
+/* ---------- 儲存按鈕：所有設定一律寫入，並告知已儲存 ---------- */
+function saveAll(msg){
+  saveCfg();try{localStorage.setItem('kz-sens',sens);}catch(_){}
+  try{localStorage.setItem(orientKey(),JSON.stringify(quad));}catch(_){}
+  saveRects();if(src)sizeProc(src.w,src.h);resetDet();
+  note(msg||'設定已儲存');setTimeout(()=>{if($('#note').textContent===(msg||'設定已儲存'))note('');},2500);
+}
+$('#saveSettings').addEventListener('click',()=>saveAll('設定已儲存'));
+$('#saveGame').addEventListener('click',()=>{saveAll('比賽設定已儲存');render();});
+
 /* ---------- game settings ---------- */
 function syncGameUI(){const g=GR();$('#gWait').value=$('#pWait').value=cfg.waitSec;$('#gInn').value=g.innings;$('#gMode').value=g.mode;$('#gPA').value=g.paN;$('#gS').value=g.strikes;$('#gB').value=g.balls;$('#gVmax').value=cfg.vmax;$('#gPA').disabled=g.mode==='outs';}
 function setGame(k,v){cfg.game[k]=v;saveCfg();syncGameUI();render();}
@@ -1595,6 +1670,14 @@ $('#zW0').addEventListener('click',()=>scaleZone(1/1.08,1));
 $('#zH1').addEventListener('click',()=>scaleZone(1,1.08));
 $('#zH0').addEventListener('click',()=>scaleZone(1,1/1.08));
 $('#zReset').addEventListener('click',()=>{quad=rectQuad(DEFAULT_ZONE);syncZone();saveZone();});
+let rotSkipped=false;
+function isPhone(){return Math.min(screen.width,screen.height)<=520;}
+function checkRotate(){
+  const el=$('#rot');if(!el)return;
+  const show=document.body.classList.contains('full')&&isPhone()&&innerHeight>innerWidth&&!rotSkipped;
+  el.hidden=!show;
+}
+$('#rotSkip').addEventListener('click',()=>{rotSkipped=true;checkRotate();placePanel();});
 let panelSide='left';try{if(localStorage.getItem('kz-side')==='right')panelSide='right';}catch(_){}
 function setFull(on){
   document.body.classList.toggle('full',on);
@@ -1603,23 +1686,30 @@ function setFull(on){
   if(on&&de.requestFullscreen&&!document.fullscreenElement){de.requestFullscreen().catch(()=>{});}
   else if(on&&de.webkitRequestFullscreen&&!document.webkitFullscreenElement){try{de.webkitRequestFullscreen();}catch(_){}}
   if(!on){try{if(document.fullscreenElement)document.exitFullscreen().catch(()=>{});else if(document.webkitFullscreenElement)document.webkitExitFullscreen();}catch(_){}}
-  requestAnimationFrame(fit);setTimeout(fit,350);
+  if(on){try{screen.orientation&&screen.orientation.lock&&screen.orientation.lock('landscape').catch(()=>{});}catch(_){}}
+  requestAnimationFrame(fit);setTimeout(fit,350);checkRotate();
 }
 document.addEventListener('fullscreenchange',()=>setTimeout(fit,100));
 function placePanel(){
   const zp=$('#zpanel'),wrap=$('#stageWrap');
-  zp.classList.toggle('right',panelSide==='right');
-  wrap.classList.toggle('pl',!zp.hidden&&panelSide==='left');wrap.classList.toggle('pr',!zp.hidden&&panelSide==='right');
+  // 直向的手機：面板改放在下方；其他情況放左邊或右邊
+  const bottom=innerHeight>innerWidth&&innerWidth<700;
+  zp.classList.toggle('bottom',bottom);zp.classList.toggle('right',!bottom&&panelSide==='right');
+  wrap.classList.toggle('pb',!zp.hidden&&bottom);
+  wrap.classList.toggle('pl',!zp.hidden&&!bottom&&panelSide==='left');wrap.classList.toggle('pr',!zp.hidden&&!bottom&&panelSide==='right');
   $('#zSwap').textContent=panelSide==='left'?'移到右邊':'移到左邊';
   requestAnimationFrame(fit);
 }
 function openEdit(){
+  document.body.classList.add('editing');
   editing=true;$('#hint').hidden=false;stage.style.cursor='move';
   // 面板放在 body 底下，全螢幕時也看得到
   $('#zpanel').hidden=false;setFull(true);placePanel();syncCfgUI();
   $('#stageEdit').hidden=true;$('#btnEdit').classList.add('on');
 }
 function saveEdit(){
+  document.body.classList.remove('editing');
+  saveAll('好球帶與設定已儲存');
   saveRects();resetDet();setET('zone');
   editing=false;$('#hint').hidden=true;stage.style.cursor='';
   $('#zpanel').hidden=true;placePanel();saveZone();
@@ -1670,6 +1760,11 @@ $('#mFlip').addEventListener('click',()=>{
 function newPA(){if(G.over)return;snap();G.prevPaStart=G.paStart||0;G.paStart=G.pitches.length;G.justEnded=true;G.balls=0;G.strikes=0;render();flash(false,'下一位打者',null,true);arm();}
 $('#mPA').addEventListener('click',newPA);
 $('#stagePA').addEventListener('click',newPA);
+function setPaused(v){
+  paused=v;$('#pausedOv').hidden=!v;const b=$('#stagePause');b.textContent=v?'繼續':'暫停';b.classList.toggle('on',v);
+  if(!v)arm();else det.tracks=[];
+}
+$('#stagePause').addEventListener('click',()=>setPaused(!paused));
 $('#mNew').addEventListener('click',()=>{snap();G=fresh();lastTrail=null;render();$('#call').textContent='';});
 
 /* ---------- boot ---------- */
