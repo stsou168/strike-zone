@@ -106,6 +106,12 @@ button.b{border-color:color-mix(in srgb,var(--ball) 60%,var(--line));color:var(-
 @keyframes rot{0%,20%{transform:rotate(0)}60%,100%{transform:rotate(-90deg)}}
 @media (prefers-reduced-motion:reduce){.rot .ph{animation:none;transform:rotate(-90deg)}}
 .savebar{display:flex;justify-content:flex-end;gap:8px;border-top:1px solid var(--line);padding-top:10px}
+.zpanel .mainOnly{display:none}
+.zpanel .panel{padding:10px;background:transparent;border-color:var(--line)}
+.zpanel .panel .seg{grid-template-columns:minmax(0,1fr)}
+.zpanel .panel .seg button{justify-items:start;text-align:left;font-size:.9rem;padding:8px 10px}
+.zpanel .panel .form{grid-template-columns:minmax(0,1fr)}
+#zpanelMore{display:grid;gap:12px}
 .zpanel #zSave{position:sticky;bottom:0;box-shadow:0 -10px 14px var(--panel)}
 body.full{overflow:hidden}
 body.full #stageWrap{position:fixed;inset:0;z-index:25;background:#000;justify-content:center;padding:calc(6px + env(safe-area-inset-top,0px)) env(safe-area-inset-right,0px) calc(8px + env(safe-area-inset-bottom,0px)) env(safe-area-inset-left,0px)}
@@ -211,16 +217,19 @@ details .para{font-size:.88rem;color:var(--muted);max-width:62ch;margin:.6em 0 0
     <button id="stageFull" type="button">全螢幕</button>
     <button id="stagePause" type="button">暫停</button>
     <button id="stagePA" type="button">下一位打者</button>
-    <button id="stageEdit" type="button">調整框</button>
+    <button id="stageEdit" type="button">設定／調整框</button>
   </div>
   </div>
   <aside class="zpanel" id="zpanel" hidden aria-label="調整好球帶">
-    <div class="zhead"><strong>調整好球帶</strong><button id="zSwap" type="button">移到右邊</button></div>
+    <div class="zhead"><strong>設定</strong><button id="zSwap" type="button">移到右邊</button></div>
+    <div hidden>
     <div class="seg" role="radiogroup" aria-label="遊戲人數模式">
       <button id="qPBC" type="button" role="radio">投打捕</button>
       <button id="qPB" type="button" role="radio">投打</button>
       <button id="qPC" type="button" role="radio">投捕</button>
     </div>
+    </div>
+    <div class="label">調整框</div>
     <div class="seg" role="radiogroup" aria-label="要調整的框">
       <button id="etZone" type="button" role="radio" aria-checked="true">好球帶</button>
       <button id="etOuter" type="button" role="radio">偵測範圍</button>
@@ -234,6 +243,7 @@ details .para{font-size:.88rem;color:var(--muted);max-width:62ch;margin:.6em 0 0
       <span>高度</span><button data-z="1,0.926" type="button" aria-label="變矮">−</button><button data-z="1,1.08" type="button" aria-label="加高">＋</button>
     </div>
     <button id="pReset" type="button">回復預設框</button>
+    <div hidden>
     <div class="btns"><button id="pBallPick" type="button">從畫面點選球</button><button id="pBatPick" type="button">從畫面點選球棒</button></div>
     <div class="form">
       <label for="pBall">球的種類<select id="pBall"><option value="pingpong">桌球 4.0 公分</option><option value="tennis">網球 6.7 公分</option><option value="soft">軟式棒球 7.0 公分</option><option value="hard">硬式棒球 7.3 公分</option></select></label>
@@ -248,7 +258,8 @@ details .para{font-size:.88rem;color:var(--muted);max-width:62ch;margin:.6em 0 0
     </div>
     <div class="tip" id="pDiag"></div>
     <label class="sl" for="pWait">每球準備時間<select id="pWait"><option value="0">不等待</option><option value="5">5 秒</option><option value="10">10 秒</option></select></label>
-    <button id="pSwing" type="button">自動判揮棒：開</button>
+    </div>
+    <div id="zpanelMore"></div>
     <button class="primary" id="zSave" type="button">儲存，開始偵測</button>
   </aside>
 
@@ -280,7 +291,7 @@ details .para{font-size:.88rem;color:var(--muted);max-width:62ch;margin:.6em 0 0
     </div>
   </section>
 
-  <section class="panel">
+  <section class="panel" id="secSettings">
     <div class="label">登錄球的樣子</div>
     <div class="ballrow">
       <span class="swatch" id="swatch" aria-hidden="true"></span>
@@ -313,6 +324,7 @@ details .para{font-size:.88rem;color:var(--muted);max-width:62ch;margin:.6em 0 0
       <button id="vPitcher" type="button" role="radio">投手後方<small>鏡頭朝好球帶，最準</small></button>
       <button id="vSide" type="button" role="radio">投手側邊<small>手機放投手旁邊，斜看好球帶</small></button>
     </div>
+    <div class="mainOnly">
     <div class="label">好球帶</div>
     <div class="btns">
       <button id="btnEdit" type="button">調整好球帶</button>
@@ -324,6 +336,7 @@ details .para{font-size:.88rem;color:var(--muted);max-width:62ch;margin:.6em 0 0
       <span>高度</span><button id="zH0" type="button" aria-label="變矮">−</button><button id="zH1" type="button" aria-label="加高">＋</button>
     </div>
     <div class="tip">按「調整好球帶」後，四個角可以各自拖到任何位置，斜角拍攝時也能貼齊實際的框。拖框的中間可以整個移動。</div>
+    </div>
     <div class="label">球與距離（用來過濾雜物、計算球速）</div>
     <div class="form">
       <label for="ballType">球的種類
@@ -354,6 +367,7 @@ details .para{font-size:.88rem;color:var(--muted);max-width:62ch;margin:.6em 0 0
     <div class="btns">
       <button id="btnVoice" type="button" class="on">語音喊判：開</button>
       <button id="btnDebug" type="button">顯示偵測過程</button>
+      <button id="pSwing" type="button">自動判揮棒：開</button>
     </div>
     <label class="sl" for="sens">偵測靈敏度
       <input id="sens" type="range" min="0" max="100" value="60">
@@ -362,7 +376,7 @@ details .para{font-size:.88rem;color:var(--muted);max-width:62ch;margin:.6em 0 0
     <div class="savebar"><button class="primary" id="saveSettings" type="button">儲存設定</button></div>
   </section>
 
-  <section class="panel">
+  <section class="panel" id="secGame">
     <div class="label">比賽</div>
     <div class="form">
       <label for="gInn">局數<select id="gInn"><option value="1">1 局</option><option value="2">2 局</option><option value="3">3 局</option><option value="4">4 局</option><option value="5">5 局</option><option value="6">6 局</option><option value="7">7 局</option><option value="9">9 局</option></select></label>
@@ -1785,7 +1799,17 @@ function placePanel(){
   $('#zSwap').textContent=panelSide==='left'?'移到右邊':'移到左邊';
   requestAnimationFrame(fit);
 }
+const MOVE_IDS=['secSettings','secGame'];
+function movePanels(into){
+  const more=$('#zpanelMore');
+  MOVE_IDS.forEach(id=>{
+    const sec=$('#'+id);if(!sec)return;
+    if(into){if(!sec.__ph){sec.__ph=document.createComment(id);sec.parentNode.insertBefore(sec.__ph,sec);}more.appendChild(sec);}
+    else if(sec.__ph&&sec.__ph.parentNode){sec.__ph.parentNode.replaceChild(sec,sec.__ph);sec.__ph=null;}
+  });
+}
 function openEdit(){
+  movePanels(true);
   document.body.classList.add('editing');
   editing=true;$('#hint').hidden=false;stage.style.cursor='move';
   // 面板放在 body 底下，全螢幕時也看得到
@@ -1793,6 +1817,7 @@ function openEdit(){
   $('#stageEdit').hidden=true;$('#btnEdit').classList.add('on');
 }
 function saveEdit(){
+  movePanels(false);
   if(M())autoDistance();
   document.body.classList.remove('editing');
   saveAll('好球帶與設定已儲存');
