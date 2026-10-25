@@ -238,8 +238,9 @@ details .para{font-size:.88rem;color:var(--muted);max-width:62ch;margin:.6em 0 0
     <div class="form">
       <label for="pBall">球的種類<select id="pBall"><option value="pingpong">桌球 4.0 公分</option><option value="tennis">網球 6.7 公分</option><option value="soft">軟式棒球 7.0 公分</option><option value="hard">硬式棒球 7.3 公分</option></select></label>
       <label for="pZoneW">好球帶實際寬度（公分）<input id="pZoneW" type="number" inputmode="decimal" min="10" max="120" step="0.1"></label>
+      <label for="pFocal">焦距 <output id="pFocalOut">1.0×</output><input id="pFocal" type="range" min="1" max="10" step="0.1" value="1"></label>
       <label for="pPitch">投手到好球帶距離（公尺）<input id="pPitch" type="number" inputmode="decimal" min="2" max="25" step="0.1"></label>
-      <label for="pDist">鏡頭到好球帶距離（公尺）<input id="pDist" type="number" inputmode="decimal" min="0.5" max="30" step="0.1"></label>
+      <label for="pDist" id="pDistRow">鏡頭到好球帶距離（公尺）<input id="pDist" type="number" inputmode="decimal" min="0.5" max="30" step="0.1"></label>
       <label for="pBatH">打者身高（公分，ABS 規則用）<input id="pBatH" type="number" inputmode="decimal" min="80" max="220" step="1" placeholder="例如 140"></label>
       <button id="pAbs" type="button">依 ABS 規則設定框的高度</button>
       <div class="tip" id="pAbsInfo"></div>
@@ -334,10 +335,12 @@ details .para{font-size:.88rem;color:var(--muted);max-width:62ch;margin:.6em 0 0
       <label for="pitchIn">投手到好球帶距離（公尺）
         <input id="pitchIn" type="number" inputmode="decimal" min="2" max="25" step="0.1">
       </label>
-      <label for="camSel">使用哪顆鏡頭<select id="camSel"><option value="">自動（後鏡頭）</option></select></label>
-      <label for="zoomIn" id="zoomRow" hidden>光學／感光元件變焦 <output id="zoomOut">1.0×</output><input id="zoomIn" type="range" min="1" max="5" step="0.1" value="1"></label>
+      <label for="modelSel">手機型號（自動選鏡頭、自動校正距離）<select id="modelSel"></select></label>
+      <label for="focalIn" id="focalRow">焦距 <output id="focalOut">1.0×</output><input id="focalIn" type="range" min="1" max="10" step="0.1" value="1"><span class="tip" id="focalTip"></span></label>
+      <label for="camSel" id="camRow" hidden>使用哪顆鏡頭<select id="camSel"><option value="">自動（後鏡頭）</option></select></label>
+      <label for="zoomIn" id="zoomRow" hidden>變焦 <output id="zoomOut">1.0×</output><input id="zoomIn" type="range" min="1" max="5" step="0.1" value="1"></label>
       <label for="resSel">鏡頭畫質<select id="resSel"><option value="4k">4K（球更清楚，30 格/秒）</option><option value="hd">1080p（60 格/秒，球速較準）</option></select></label>
-      <label for="distIn"><span id="distLabel">鏡頭到好球帶距離（公尺）</span>
+      <label for="distIn" id="distRow"><span id="distLabel">鏡頭到好球帶距離（公尺）</span>
         <input id="distIn" type="number" inputmode="decimal" min="0.5" max="30" step="0.1">
       </label>
     </div>
@@ -541,7 +544,7 @@ function diag(nativePx,nativeW){
   if(px>=6)t+='：大小足夠。';
   else{
     const need=Math.max(0.6,z0*px/6),move=z0-need;
-    t+=(px<3?'：太小，偵測會很不穩。':'：偏小。')+(view!=='catcher'&&move>0.2?'建議把鏡頭往好球帶方向移近約 '+move.toFixed(1)+' 公尺（鏡頭到好球帶約 '+need.toFixed(1)+' 公尺）。':'')+(nativeW&&nativeW<3000&&cfg.res4k?'這台裝置沒有提供 4K 畫面。':'');
+    t+=(px<3?'：太小，偵測會很不穩。':'：偏小。')+(M()?'請把焦距調大，或把手機移近。':'')+(!M()&&view!=='catcher'&&move>0.2?'建議把鏡頭往好球帶方向移近約 '+move.toFixed(1)+' 公尺（鏡頭到好球帶約 '+need.toFixed(1)+' 公尺）。':'')+(nativeW&&nativeW<3000&&cfg.res4k?'這台裝置沒有提供 4K 畫面。':'');
   }
   if(view!=='catcher'){
     const back=z0-cfg.pitchDist;
@@ -587,7 +590,7 @@ addEventListener('orientationchange',()=>setTimeout(fit,300));
    - 球撞網後彈跳 → 判定後短暫冷卻
 ------------------------------------------------ */
 const BALLS={pingpong:{n:'桌球',d:0.040},tennis:{n:'網球',d:0.067},soft:{n:'軟式棒球',d:0.070},hard:{n:'硬式棒球',d:0.073}};
-let cfg={v:3,camId:'',zoom:1,res4k:true,pitchDist:6,waitSec:5,players:'pbc',ball:'pingpong',zoneW:43.2,batH:0,vmax:120,swingAuto:true,batSide:'right',game:{innings:3,mode:'outs',paN:5,strikes:3,balls:4},dist:{pitcher:7,side:6,catcher:1.5},debug:false};
+let cfg={model:'',focal:0,v:3,camId:'',zoom:1,res4k:false,pitchDist:6,waitSec:5,players:'pbc',ball:'pingpong',zoneW:43.2,batH:0,vmax:120,swingAuto:true,batSide:'right',game:{innings:3,mode:'outs',paN:5,strikes:3,balls:4},dist:{pitcher:7,side:6,catcher:1.5},debug:false};
 try{const c=JSON.parse(localStorage.getItem('kz-cfg'));if(c&&(c.v||0)<3){c.res4k=false;c.v=3;}if(c&&BALLS[c.ball])cfg={...cfg,...c,dist:{...cfg.dist,...(c.dist||{})},game:{...cfg.game,...(c.game||{})}};}catch(e){}
 function saveCfg(){try{localStorage.setItem('kz-cfg',JSON.stringify(cfg));}catch(_){}}
 let armAt=0,armAnnounced=true,paused=false;
@@ -1244,8 +1247,8 @@ function videoLoop(useMedia){
   }
 }
 function clearDemoPitches(){if(G.pitches.some(p=>p.demo)){G=fresh();hist.length=0;render();}}
-async function startCamera(){
-  stopAll();note('');
+async function startCamera(relens){
+  stopAll();if(!relens)note('');
   if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){
     note('這個環境不支援即時相機。請改用「錄一球」：錄下一次投球後，程式會自動分析並判定。');return;
   }
@@ -1254,12 +1257,13 @@ async function startCamera(){
     if(cfg.camId)vc.deviceId={exact:cfg.camId};else vc.facingMode={ideal:'environment'};
     try{stream=await navigator.mediaDevices.getUserMedia({audio:false,video:vc});}
     catch(e1){if(!cfg.camId)throw e1;cfg.camId='';saveCfg();stream=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{ideal:'environment'},width:{ideal:cfg.res4k?3840:1920},height:{ideal:cfg.res4k?2160:1080},frameRate:{ideal:cfg.res4k?30:60}}});}
-    video.srcObject=stream;listCams();setupZoom();video.muted=true;
+    video.srcObject=stream;await listCams();setupZoom();video.muted=true;
     await video.play();
     if(!video.videoWidth)await new Promise(r=>video.addEventListener('loadedmetadata',r,{once:true}));
     clearDemoPitches();
     setSource(video,video.videoWidth,video.videoHeight,'camera');
     setFull(true);syncRecBtn();arm();
+    if(M()){if(!relens){await applyLens();if(!stream)return;}else{curLens=wantLens();const tr=stream.getVideoTracks()[0],cap=tr.getCapabilities?tr.getCapabilities():{};if(cap.zoom){try{await tr.applyConstraints({advanced:[{zoom:Math.min(cap.zoom.max,Math.max(cap.zoom.min,lensZoom(curLens)))}]});}catch(_){}}setTimeout(autoDistance,600);}}
     if(!ballModel)note('還沒登錄球的顏色，程式不會自動判定。請把球放在框附近，按「從目前畫面點選球」。');
     videoLoop(false);
     try{if(navigator.wakeLock)await navigator.wakeLock.request('screen');}catch(e){}
@@ -1579,21 +1583,102 @@ $('#btnRec').addEventListener('click',()=>{
   rec.start();$('#btnRec').textContent='錄影中…';setTimeout(()=>{try{rec.stop();}catch(_){}},10000);
 });
 
-/* ---------- 鏡頭選擇與變焦：iPhone Pro 的長焦鏡頭可以從遠處把球拍大 ---------- */
-const CAM_NAMES=[[/telephoto/i,'長焦鏡頭'],[/ultra ?wide/i,'超廣角鏡頭'],[/dual wide/i,'雙廣角'],[/triple/i,'三鏡頭（自動切換）'],[/dual/i,'雙鏡頭（自動切換）'],[/back|rear|environment|後/i,'廣角鏡頭'],[/front|前/i,'前鏡頭']];
-function camName(l){for(const[re,n]of CAM_NAMES)if(re.test(l))return n+'（'+l+'）';return l||'鏡頭';}
+/* ---------- 手機型號：自動選鏡頭模組、自動換算距離 ----------
+   wide：主鏡頭等效焦距（mm）；tele：長焦等效焦距；teleX：長焦倍率
+-------------------------------------------------------------- */
+const MODELS=[
+  ['iphone16pro','iPhone 16 Pro／16 Pro Max',{wide:24,tele:120,teleX:5}],
+  ['iphone15promax','iPhone 15 Pro Max',{wide:24,tele:120,teleX:5}],
+  ['iphone15pro','iPhone 15 Pro',{wide:24,tele:77,teleX:3}],
+  ['iphone14pro','iPhone 14 Pro／14 Pro Max',{wide:24,tele:77,teleX:3}],
+  ['iphone13pro','iPhone 13 Pro／13 Pro Max',{wide:26,tele:77,teleX:3}],
+  ['iphone12promax','iPhone 12 Pro Max',{wide:26,tele:65,teleX:2.5}],
+  ['iphone12pro','iPhone 12 Pro',{wide:26,tele:52,teleX:2}],
+  ['iphone11pro','iPhone 11 Pro／11 Pro Max',{wide:26,tele:52,teleX:2}],
+  ['iphone16','iPhone 16／16 Plus／16e（無長焦）',{wide:26}],
+  ['iphone15','iPhone 15／15 Plus（無長焦）',{wide:26}],
+  ['iphone14','iPhone 14／13／12／11 等（無長焦）',{wide:26}],
+  ['ipadpro','iPad Pro',{wide:28}],
+  ['ipad','iPad／iPad Air／iPad mini',{wide:29}],
+  ['','其他手機（手動選鏡頭）',null]
+];
+function M(){const m=MODELS.find(x=>x[0]===cfg.model);return m&&m[2];}
+const TELE_RE=/望遠|長焦|telephoto/i,BAD_RE=/ultra|dual|triple|front|超廣角|雙|三|前/i,WIDE_RE=/back camera|後置相機|後置鏡頭|rear camera/i;
+function camName(l){
+  if(TELE_RE.test(l))return'長焦鏡頭（'+l+'）';if(/超廣角|ultra ?wide/i.test(l))return'超廣角鏡頭（'+l+'）';
+  if(/三鏡頭|triple/i.test(l))return'三鏡頭自動切換（'+l+'）';if(/雙廣角|dual wide/i.test(l))return'雙廣角自動切換（'+l+'）';
+  if(/雙鏡頭|dual/i.test(l))return'雙鏡頭自動切換（'+l+'）';if(/前|front/i.test(l))return'前鏡頭（'+l+'）';
+  if(WIDE_RE.test(l))return'廣角主鏡頭（'+l+'）';return l||'鏡頭';
+}
+let camDevs=[];
 async function listCams(){
   try{
-    const ds=(await navigator.mediaDevices.enumerateDevices()).filter(d=>d.kind==='videoinput');
-    const sel=$('#camSel');sel.innerHTML='<option value="">自動（後鏡頭）</option>'+ds.map(d=>'<option></option>').join('');
-    ds.forEach((d,i)=>{const o=sel.options[i+1];o.value=d.deviceId;o.textContent=camName(d.label);});
-    sel.value=cfg.camId&&ds.some(d=>d.deviceId===cfg.camId)?cfg.camId:'';
+    camDevs=(await navigator.mediaDevices.enumerateDevices()).filter(d=>d.kind==='videoinput');
+    const sel=$('#camSel');sel.innerHTML='<option value="">自動（後鏡頭）</option>'+camDevs.map(()=>'<option></option>').join('');
+    camDevs.forEach((d,i)=>{const o=sel.options[i+1];o.value=d.deviceId;o.textContent=camName(d.label);});
+    sel.value=cfg.camId&&camDevs.some(d=>d.deviceId===cfg.camId)?cfg.camId:'';
   }catch(_){}
 }
+// 依焦距決定要用哪顆鏡頭：焦距到長焦倍率以上就用長焦鏡頭，其餘用廣角主鏡頭
+function wantLens(){const m=M();if(!m)return null;return m.tele&&cfg.focal>=m.teleX-0.01?'tele':'wide';}
+function deviceFor(kind){
+  if(kind==='tele')return camDevs.find(d=>TELE_RE.test(d.label));
+  return camDevs.find(d=>WIDE_RE.test(d.label)&&!BAD_RE.test(d.label))||camDevs.find(d=>/back|後/i.test(d.label)&&!BAD_RE.test(d.label)&&!TELE_RE.test(d.label));
+}
+function lensZoom(kind){const m=M();return kind==='tele'?cfg.focal/m.teleX:cfg.focal;}
+// 目前畫面的等效焦距（mm）：用來從好球帶在畫面上的寬度，換算鏡頭到好球帶的距離
+function curFocalMm(){const m=M();if(!m)return 0;const k=curLens||wantLens();return k==='tele'?m.tele*(cfg.focal/m.teleX):m.wide*cfg.focal;}
+let curLens=null;
+function autoDistance(){
+  const m=M();if(!m||!src||src.kind!=='camera')return;
+  const frac=zoneEdges(1,src.h/src.w).w;if(!(frac>0.005))return;
+  const widthMm=src.w>=src.h?36:36*src.w/src.h;          // 畫面寬度對應的 35mm 片幅尺寸
+  const d=(cfg.zoneW/100)*curFocalMm()/(widthMm*frac);
+  if(d>0.3&&d<40){cfg.dist[view]=Math.round(d*10)/10;saveCfg();syncCfgUI();if(src)sizeProc(src.w,src.h);}
+}
+async function applyLens(){
+  // 型號已知：自動挑鏡頭；若需要換鏡頭就重開相機
+  const m=M();if(!m||!stream)return;
+  if(!camDevs.length)await listCams();
+  const kind=wantLens(),dev=deviceFor(kind),tr=stream.getVideoTracks()[0];
+  const curId=tr&&tr.getSettings?tr.getSettings().deviceId:'';
+  if(dev&&dev.deviceId!==curId){cfg.camId=dev.deviceId;saveCfg();await startCamera(true);return;}
+  curLens=dev?kind:(curLens||'wide');
+  if(kind==='tele'&&!dev)toast('找不到長焦鏡頭，改用主鏡頭放大。');
+  const z=dev?lensZoom(kind):cfg.focal;
+  const cap=tr&&tr.getCapabilities?tr.getCapabilities():{};
+  if(cap.zoom){const v=Math.min(cap.zoom.max,Math.max(cap.zoom.min,z));try{await tr.applyConstraints({advanced:[{zoom:v}]});}catch(_){}}
+  resetDet();setTimeout(autoDistance,400);
+}
+function syncModelUI(){
+  const sel=$('#modelSel');
+  if(!sel.options.length){MODELS.forEach(([k,n])=>{const o=document.createElement('option');o.value=k;o.textContent=n;sel.appendChild(o);});}
+  sel.value=cfg.model;const m=M();
+  $('#camRow').hidden=!!m;$('#focalRow').hidden=!m;$('#distRow').hidden=!!m;$('#pDistRow').hidden=!!m;
+  $('#pFocal').closest('label').hidden=!m;
+  if(m){
+    const max=m.tele?Math.min(m.teleX*2,10):5;
+    [$('#focalIn'),$('#pFocal')].forEach(z=>{z.min=1;z.max=max;z.step=0.1;z.value=cfg.focal;});
+    const t=cfg.focal.toFixed(1)+'×';$('#focalOut').textContent=$('#pFocalOut').textContent=t;
+    $('#focalTip').textContent=(m.tele?(cfg.focal>=m.teleX-0.01?'使用長焦鏡頭（'+m.teleX+'× 光學）':'使用主鏡頭；調到 '+m.teleX+'× 以上會自動切換長焦鏡頭'):'使用主鏡頭（超過 1× 為數位放大）')+'。鏡頭距離會依好球帶大小自動換算'+(cfg.dist[view]?'，目前約 '+cfg.dist[view]+' 公尺':'')+'。';
+  }
+}
+function setModel(k){
+  cfg.model=k;const m=M();cfg.focal=m?(m.tele?m.teleX:1):0;if(m)cfg.camId='';saveCfg();syncModelUI();
+  if(stream&&m)applyLens();
+}
+function setFocal(v){
+  const m=M();if(!m)return;cfg.focal=Math.round(+v*10)/10;saveCfg();syncModelUI();if(stream)applyLens();
+}
+$('#modelSel').addEventListener('change',e=>setModel(e.target.value));
+$('#focalIn').addEventListener('change',e=>setFocal(e.target.value));
+$('#pFocal').addEventListener('change',e=>setFocal(e.target.value));
+['focalIn','pFocal'].forEach(id=>$('#'+id).addEventListener('input',e=>{$('#focalOut').textContent=$('#pFocalOut').textContent=(+e.target.value).toFixed(1)+'×';}));
+syncModelUI();
 function setupZoom(){
   const tr=stream&&stream.getVideoTracks()[0],cap=tr&&tr.getCapabilities?tr.getCapabilities():{};
   const row=$('#zoomRow');
-  if(cap.zoom&&cap.zoom.max>cap.zoom.min){
+  if(!M()&&cap.zoom&&cap.zoom.max>cap.zoom.min){
     const z=$('#zoomIn');z.min=cap.zoom.min;z.max=Math.min(cap.zoom.max,10);z.step=cap.zoom.step||0.1;
     z.value=Math.min(Math.max(cfg.zoom||1,cap.zoom.min),z.max);row.hidden=false;applyZoom(+z.value);
   }else row.hidden=true;
@@ -1708,6 +1793,7 @@ function openEdit(){
   $('#stageEdit').hidden=true;$('#btnEdit').classList.add('on');
 }
 function saveEdit(){
+  if(M())autoDistance();
   document.body.classList.remove('editing');
   saveAll('好球帶與設定已儲存');
   saveRects();resetDet();setET('zone');
